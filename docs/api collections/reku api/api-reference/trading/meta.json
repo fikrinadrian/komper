@@ -1,0 +1,4 @@
+{
+  "title": "Trading",
+  "pages": ["place-order", "cancel-order", "pending-orders"]
+}

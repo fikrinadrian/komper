@@ -1,0 +1,10 @@
+node_modules
+dist
+playwright-report
+test-results
+package-lock.json
+pnpm-lock.yaml
+docs/api collections
+docs/product
+docs/architecture
+docs/quality

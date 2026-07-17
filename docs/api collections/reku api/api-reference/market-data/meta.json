@@ -1,0 +1,4 @@
+{
+  "title": "Market Data",
+  "pages": ["coins", "market", "market-symbol", "orderbook", "chart"]
+}
