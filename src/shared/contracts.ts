@@ -55,6 +55,12 @@ export type EstimateStatus =
   | 'UNSUPPORTED'
   | 'UNVERIFIED_RULES';
 
+export type MarketTransport =
+  'REST_SNAPSHOT' | 'REST_POLL' | 'WS_FULL_SNAPSHOT' | 'WS_SEQUENCED_DELTA';
+
+export type MarketSynchronization =
+  'SYNCHRONIZED' | 'SYNCHRONIZING' | 'GAPPED' | 'RECONNECTING' | 'STOPPED';
+
 export type IncrementRule = {
   state: 'VERIFIED' | 'DISABLED' | 'UNVERIFIED';
   normalizedStep?: string;
@@ -107,6 +113,11 @@ export type VenueEstimate = {
   ageMs?: number;
   freshnessIndependentlyVerified: boolean;
   externalUrl: string;
+  transport?: MarketTransport;
+  synchronization?: MarketSynchronization;
+  connectionEpoch?: number;
+  liveRevision?: number;
+  healthReason?: string;
 };
 
 export type ComparisonResponse = {
@@ -120,6 +131,109 @@ export type ComparisonResponse = {
   results: VenueEstimate[];
   disclosure: string;
   exclusions: string[];
+  streamRevision?: number;
+};
+
+export type MarketDataStatus = 'AVAILABLE' | 'STALE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+
+export type MarketComponentState = {
+  status: MarketDataStatus;
+  reason?: string;
+};
+
+export type MarketTicker = {
+  venue: Venue;
+  venueSymbol: string;
+  lastPrice: string;
+  bestBid?: string;
+  bestAsk?: string;
+  high24h?: string;
+  low24h?: string;
+  open24h?: string;
+  priceChangePercent24h?: string;
+  baseVolume24h?: string;
+  quoteVolume24h?: string;
+  sourceEventAt?: string;
+  receivedAt: string;
+};
+
+export type MarketOverviewVenue = {
+  venue: Venue;
+  status: MarketDataStatus;
+  ticker?: MarketTicker;
+  reason?: string;
+};
+
+export type MarketOverviewRow = {
+  pair: string;
+  asset: string;
+  quote: 'IDR';
+  venues: MarketOverviewVenue[];
+};
+
+export type MarketsResponse = {
+  schemaVersion: '1';
+  generatedAt: string;
+  rows: MarketOverviewRow[];
+  disclosure: string;
+};
+
+export type MarketTrade = {
+  id: string;
+  price: string;
+  quantity: string;
+  side?: Side;
+  occurredAt: string;
+};
+
+export type MarketCandle = {
+  openedAt: string;
+  closedAt?: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  baseVolume?: string;
+  quoteVolume?: string;
+  tradeCount?: number;
+};
+
+export type MarketOrderBook = {
+  bids: Array<{ price: string; quantity: string }>;
+  asks: Array<{ price: string; quantity: string }>;
+  sourceEventAt?: string;
+  receivedAt: string;
+  freshnessIndependentlyVerified: boolean;
+};
+
+export type MarketDetailVenue = {
+  venue: Venue;
+  marketSegment: string;
+  venueSymbol: string;
+  status: MarketDataStatus;
+  reason?: string;
+  ticker?: MarketTicker;
+  orderBook?: MarketOrderBook;
+  trades?: MarketTrade[];
+  tradeSampleStatus: MarketDataStatus;
+  candles?: MarketCandle[];
+  components: {
+    ticker: MarketComponentState;
+    orderBook: MarketComponentState;
+    trades: MarketComponentState;
+    candles: MarketComponentState;
+  };
+};
+
+export type MarketDetailResponse = {
+  schemaVersion: '1';
+  pair: string;
+  asset: string;
+  quote: 'IDR';
+  interval: '1h';
+  generatedAt: string;
+  venues: MarketDetailVenue[];
+  disclosure: string;
 };
 
 export type ApiError = {

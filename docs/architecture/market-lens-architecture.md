@@ -2,14 +2,16 @@
 
 ## Document status
 
-- Status: Draft
+- Status: Accepted for WebSocket implementation
 - Owner: CTO
-- Last updated: 2026-07-17
-- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md)
+- Last updated: 2026-07-18
+- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md); [ADR-002: Live market data and browser delivery](./adr/ADR-002-live-market-data-and-browser-delivery.md); [ADR-003: Markets read models and comparative chart](./adr/ADR-003-markets-read-models-and-comparative-chart.md)
 
 ## Context and goals
 
-Komper Market Lens compares the estimated outcome of buying or selling an asset for a specified IDR notional across Indodax, Reku, and Tokocrypto. The estimate is derived from available order-book levels rather than the last traded price. It must expose the data time, venue, depth consumed, estimated average price, slippage, and fee assumptions so a user can judge the comparison.
+Komper Market Lens compares the estimated outcome of buying or selling an asset for a specified IDR notional across Indodax, Reku, and Tokocrypto. The estimate is derived from available order-book levels rather than the last traded price. It must expose the data time, venue, depth consumed, estimated average price, slippage, and fee assumptions so a user can judge the comparison. The Markets extension adds a browsable IDR market overview and pair detail that compare ticker statistics, order-book liquidity, recent transaction activity, and aligned OHLC history without implying that unlike venue feeds are perfectly equivalent.
+
+Current state on 2026-07-18 is REST-snapshot only: each comparison calls `VenueAdapter.getBook()` and the browser polls `/api/comparisons` every 15 seconds. There is no exchange WebSocket worker, canonical live-book store, or browser live-delivery endpoint. The following accepted scope adds those pieces without weakening the existing decimal, increment, schema, fee, and health gates.
 
 The repository contains API documentation collections for all three venues. Their interfaces are not symmetric:
 
@@ -17,7 +19,7 @@ The repository contains API documentation collections for all three venues. Thei
 - Reku provides public REST and WebSocket market data plus authenticated balance, history, and trading endpoints, but the supplied collection does not document a private fill stream, idempotency key, sandbox, or deadman switch.
 - Tokocrypto provides REST snapshots and sequenced depth deltas, trades, tickers, account/order history, private balance and execution events, OCO, self-trade prevention, and execution rules. Its routing varies by `symbolType` across multiple REST and WebSocket hosts. Its documented client order ID is not unique and therefore is not an idempotency mechanism.
 
-The initial goal is an observational, public-data product covering canonical IDR markets that are simultaneously available and healthy at the compared venues. Adding Tokocrypto makes three-venue comparison technically feasible, but it does not establish that every asset has comparable IDR liquidity at all three venues.
+The initial goal is an observational, public-data product covering canonical IDR markets. Effective-price ranking remains limited to markets simultaneously available and healthy at the compared venues. The Markets browse/read models may show the union of active, verified direct-IDR instruments so missing venue coverage is visible; a comparative winner or cross-venue claim still requires at least two healthy venues. Adding Tokocrypto makes three-venue comparison technically feasible, but it does not establish that every asset has comparable IDR liquidity at all three venues.
 
 Explicit non-goals for the first release are:
 
@@ -39,6 +41,7 @@ Explicit non-goals for the first release are:
 - **Observability:** Operators can determine, per venue and instrument, whether a comparison was omitted because of staleness, sequence gaps, schema rejection, rate limiting, or insufficient depth.
 - **Cost:** WebSocket streams are preferred for continuously changing data; REST calls are reserved for discovery, snapshots, recovery, and verification. Historical retention is bounded and configurable.
 - **Accessibility:** Status and ranking changes are conveyed by text and semantics, not color alone. Reduced-motion preferences apply to live-update animation in the consuming application.
+- **Comparable history:** Cross-venue movement uses the same UTC buckets and one common baseline instant. Missing candles remain gaps; they are never forward-filled or silently rebased at different times.
 
 ## System context
 
@@ -77,6 +80,8 @@ The exchange boundary is untrusted. Successful HTTP or WebSocket transport does 
 | Order-book state builders      | Build or replace local books, enforce sequence rules when available, and invalidate state on gaps                   | Snapshots, deltas, connection epochs, sync status                 | Market-data engineering   |
 | Freshness and health evaluator | Determines whether each venue/instrument is eligible for display, ranking, and alerts                               | Lag, gap, schema, connection, and rate-limit signals              | Platform engineering      |
 | Quote and comparison service   | Walks eligible order books for a side-appropriate size and returns weighted average price, slippage, depth, and assumptions | `ComparisonRequest`, `VenueEstimate`, `ComparisonResult`          | Application engineering   |
+| Markets read-model service     | Builds bounded overview/detail projections for ticker, book, trade activity, and comparative OHLC without client fan-out | `MarketOverview`, `MarketDetail`, `OrderBookComparison`, `TradeActivity`, `CandleComparison` | Application engineering   |
+| Candle builder                 | Validates native candles or aggregates normalized trades/ticks into aligned UTC OHLCV buckets and records completeness | `CanonicalTrade`, `CanonicalCandle`, interval/coverage metadata   | Market-data engineering   |
 | Current-state cache            | Serves synchronized books, catalog metadata, health, and recent estimates                                           | Keyed by venue, segment, and canonical instrument                 | Platform engineering      |
 | Bounded history store          | Supports charts, investigations, replay tests, and reliability evidence                                             | Normalized events or sampled book snapshots with retention policy | Data/platform engineering |
 | Query API                      | Provides read-only product contracts and preserves health/provenance in responses                                   | HTTP or typed RPC; no exchange credentials                        | Application engineering   |
@@ -92,6 +97,30 @@ Component ownership names are functional placeholders until teams are assigned.
 3. A canonical mapping job proposes base/quote identities. Ambiguous aliases remain `UNVERIFIED` and are excluded.
 4. The eligible comparison set is the intersection of active, verified IDR instruments, not a hard-coded list.
 5. Catalog changes are versioned and trigger a controlled subscription update.
+6. The selectable trade-estimate catalog is the three-venue intersection. The Markets browse catalog is the verified direct-IDR union and includes an explicit per-venue `AVAILABLE`, `UNAVAILABLE`, or health state; the two concepts must not share an ambiguous `selectable` flag.
+
+### Markets overview and pair routing
+
+1. Client routes are `/markets` and canonical `/markets/:pair`, where `:pair` is lower-case `base-quote` such as `btc-idr`. Only direct `IDR` quote pairs are accepted in this release. Route parsing is case-insensitive, but a non-canonical path is replaced with its lower-case form; malformed paths show a route-level not-found state and a well-formed pair absent from the registry shows a market-not-found state.
+2. Phase 1 adds no router dependency. A centralized, exhaustively tested path parser handles only `/`, `/markets`, and `/markets/:pair`; native links and browser history preserve deep-link reload and back/forward behavior. TanStack Query remains the only network cache. Adopt TanStack Router when range/interval become URL search state, nested Markets navigation/layouts appear, route loaders or pending states need coordination, or hand-written parsing would expand beyond these bounded read-only patterns.
+3. The overview is produced from one batched ticker/catalog operation per venue, never one upstream request per displayed pair. It lists the union of verified active IDR instruments and preserves an unavailable cell for a venue that does not list or cannot currently serve the pair.
+4. In phase 1, the detail route consumes one aggregated BFF snapshot containing instrument identity plus independently settled ticker, order-book, trade, and candle components per venue. A component failure is represented inside the snapshot and does not erase healthy data. Capability-specific endpoints are the next step when measured latency, payload, or refresh-cadence differences justify independent loading.
+
+### Ticker, trades, and OHLC ingestion
+
+1. Venue adapters separately advertise `TICKER`, `ORDER_BOOK`, `TRADES`, and `CANDLES` capabilities. A venue or market segment is not assumed to support a capability because another segment does.
+2. Tickers normalize last trade price, open/high/low, best bid/ask, base and quote volume, window start/duration, and source/receive times. Fields remain optional when the venue does not provide them. A last price is labeled as a historical trade, not an executable price.
+3. Trades normalize an opaque venue trade ID when present, trade time, price, base quantity, derived quote notional, and aggressor side. Indodax and Reku side values and Tokocrypto's `isBuyerMaker` are mapped only after fixtures prove their taker-side semantics; otherwise `aggressorSide` is `UNKNOWN`. Aggregate and raw trade feeds preserve a `granularity` field and are not compared as event counts without a common aggregation definition.
+4. Native venue candles are validated for field order and time units before normalization. Reku's documented array is `open, close, low, high`, unlike standard OHLC order; Tokocrypto uses standard `open, high, low, close`. Indodax chart ticks are inputs to the server-side candle builder rather than being mislabeled as native OHLC.
+5. The candle builder uses half-open UTC intervals `[openTime, closeTime)`, exact decimal arithmetic, deterministic duplicate handling, and an `isClosed` flag. A reconnect or collection gap marks affected candles `PARTIAL`; it does not synthesize prices. Historical chart availability begins only where retained coverage is known, especially for Indodax, which has no documented historical OHLC REST response in the supplied collection.
+6. Recent activity comparisons use the same requested wall-clock window and report base volume, quote volume, trade/aggregate count, buy/sell notional only where side semantics are verified, plus coverage start/end. No activity winner is shown when coverage or feed granularity differs materially.
+
+### Comparative price-movement chart
+
+1. The API returns canonical OHLCV per venue. The primary single chart overlays each venue's normalized close-price percentage movement, while raw OHLC remains available in the tooltip, accessible table, and a venue-focused candle inspection state. Overlaying three candlestick series is rejected because occlusion makes comparison ambiguous.
+2. For the requested range and interval, the service finds the earliest closed bucket with a valid close for every included healthy venue. That instant is `commonBaselineAt`; each series uses `normalizedChangePercent = (close / baselineClose - 1) * 100`. The shared baseline is therefore `0%`, and `1%` means a one-percent gain from the same instant.
+3. A venue with no common baseline or insufficient closed buckets is excluded with a reason. Later missing buckets are returned as gaps and not interpolated. The response includes raw close, normalized percentage change, baseline price, candle status, source/receive times, and coverage so the transform is reproducible.
+4. Supported product intervals are an explicit verified intersection, initially `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w` only where each included adapter or candle builder can supply them. Range/interval combinations are server allowlisted and capped at 500 buckets per venue.
 
 ### Live order-book ingestion
 
@@ -129,6 +158,63 @@ Component ownership names are functional placeholders until teams are assigned.
 - Schema drift quarantines only the affected venue capability or segment and does not corrupt other venues.
 - Clock-offset checks use venue server time where available. Receive-time freshness remains visible when source time is absent.
 - Deployment rollback retains the last compatible canonical schema reader. Incompatible producers are stopped before rolling back consumers.
+- Overview and detail projections use per-venue `Promise.allSettled` semantics or equivalent isolation. Healthy venue data is returned with explicit unavailable/stale peers; no stale value may be labeled current merely to keep a complete table.
+- Server-side caches are keyed by canonical pair, venue, segment, capability, and query bounds. Concurrent identical refreshes are single-flighted. Ticker/book/trade snapshots have short configurable TTLs that never exceed their freshness threshold; expired last-known-good values may be displayed only with `STALE`, age, and last-success timestamps.
+- The visible phase-1 client uses one configurable bounded polling cadence for the aggregate detail snapshot until capability endpoints are extracted; the overview has its own cadence. Polling pauses when the document is hidden or the browser is offline, and retries use capped exponential backoff with jitter. After extraction, ticker/book/trades and candles use separate cadences and manual retry targets only the failed projection.
+- WebSocket ingest can run at exchange speed, but UI publication is coalesced to at most once per second. A transport reconnect, cache hit, or HTTP 200 never upgrades health without passing the capability's freshness and synchronization policy.
+
+### Accepted WebSocket implementation contract
+
+This release covers **public spot order books only** for the configured direct-IDR allowlist. Ticker, trade, candle, private, account, and execution streams are not part of this work.
+
+| Capability | Exact protocol scope | Book and recovery policy |
+| --- | --- | --- |
+| Indodax spot | Connect server-side to `wss://ws3.indodax.com/ws/` with the documented static public-token handshake; method `1` subscribes to `market:order-book-<pair>`, method `2` unsubscribes, and method `7` is ping. Publications contain complete `ask`/`bid` arrays and an offset; subscription state includes `recoverable`, server `epoch`, and offset. | Treat every publication as a complete snapshot and atomically replace, never merge. Track server epoch, offset, connection epoch, and receive time. After disconnect attempt `recover:true` with the last accepted offset; accept recovered publications only for the same server epoch with contiguous increasing offsets. Epoch change, non-recoverable response, offset gap/regression, bad frame, or failed recovery invalidates the book. Rejoin cleanly, require a fresh valid full snapshot, and correlate with REST depth before eligibility. Because repository recovery examples use another channel, observed order-book recovery is a release gate; safe invalidation remains the fallback. |
+| Reku spot | Connect server-side to Phoenix Channels at `wss://ws.reku.id/socket`, join `order:{coinId}`, process `data`, correlate join/error refs, send Phoenix heartbeat, and leave removed channels. Stay under documented limits: 10 connections/IP, 50 channels/connection, and 100 messages/second. | Each `bs.b`/`bs.s` payload is a complete snapshot and atomically replaces the prior book. Verify `i` equals the subscribed coin ID. Never merge and never invent a sequence or source time. A close, join/channel error, or heartbeat failure creates a new connection epoch and invalidates old state until the first valid new snapshot. Periodic REST correlation detects divergence; use receive-time health with `freshnessIndependentlyVerified:false`. |
+| Tokocrypto spot type 1 | Use the documented type-1 diff-depth stream with lowercase symbol and `_` removed. Start with `<symbol>@depth`, not `@100ms`. Parse configured raw or combined wrappers. Frames carry source time `E`, symbol `s`, first/final IDs `U/u`, and absolute `b/a` quantities. REST depth supplies `lastUpdateId`. | Buffer before REST snapshot; discard `u <= lastUpdateId`; first accepted event must satisfy `U <= lastUpdateId + 1 <= u`; thereafter require `U == previous.u + 1`. Zero quantity removes a level. Publish nothing until synchronized. Gap, reorder, overflow, invalid frame, symbol mismatch, reconnect, or epoch change invalidates and restarts bootstrap. Handle ping/pong and renew before the documented 24-hour expiry. Enable `@100ms` only after backpressure/load evidence. |
+| Tokocrypto spot type 3 | Use scheduled public REST snapshots from the documented type-3 depth host. No type-3 WebSocket in this release. | Atomically replace valid REST snapshots with transport `REST_POLL`; expose its lower cadence and no sequence guarantee. A type-3 WebSocket needs captured frames, proven independent snapshot/delta semantics, replay tests, and an ADR amendment. Type-1 semantics must never be reused. |
+
+The Indodax static token is public protocol configuration, not a customer credential, but it remains server-side, configurable, and redacted. Browsers never connect to venue WebSockets or receive venue protocol tokens.
+
+### Canonical live-book store and health
+
+Implement a process-local `LiveBookStore` keyed by `(venue, marketSegment, venueSymbol)`, with exactly one writer per key. A capability-specific builder validates the complete next state privately, then publishes one immutable atomic record:
+
+```text
+LiveBookRecord {
+  revision                 // local monotonic revision
+  connectionEpoch
+  transport                // WS_FULL_SNAPSHOT | WS_SEQUENCED_DELTA | REST_POLL
+  sourceEventAt?
+  receivedAt
+  processedAt
+  sourceSequenceStart?
+  sourceSequenceEnd?
+  sourceOffset?
+  serverEpoch?
+  synchronization          // SYNCHRONIZING | SYNCHRONIZED | UNSYNCED
+  health                   // STARTING | LIVE | STALE | GAPPED | RECONNECTING | UNVERIFIED | UNAVAILABLE | STOPPED
+  healthReason?
+  canonicalBook?
+}
+```
+
+Readers never see half-applied deltas. Reject old-epoch writes. Only `SYNCHRONIZED + LIVE` can rank or alert. Public status maps `GAPPED`, `RECONNECTING`, and `SYNCHRONIZING` to `UNSYNCED`; `STALE` remains `STALE`; stopped/unavailable maps to `UNAVAILABLE`. Connection supervisors use bounded exponential backoff with jitter, protocol-specific heartbeat, silence detection, and a new epoch per connection. An open socket is never sufficient for `LIVE`.
+
+The store is intentionally non-durable. Restart begins empty and not-ready, creates new epochs, and bootstraps again; a persisted book must not be presented as current. The first deployment has one ingestion owner. Horizontal BFF scaling is blocked until leader election and canonical state distribution receive a separate decision.
+
+### BFF-to-browser transport
+
+Use same-origin **Server-Sent Events** at `GET /api/live/comparisons?asset=<asset>&side=<side>&amount=<decimal>`, validated by the existing request schema. Return `text/event-stream`, `Cache-Control: no-store`, and disable proxy buffering where supported.
+
+- Send a full current `comparison` event immediately, then full replacement `ComparisonResponse` values when a relevant book or health revision changes.
+- Additive fields may carry `streamRevision`, transport, synchronization, and health reason; existing REST response fields remain compatible.
+- Coalesce only after canonical publication at a configurable UI cadence. Never drop/coalesce Tokocrypto deltas before the state builder.
+- Send comment heartbeats. SSE IDs are process-local; `Last-Event-ID` is advisory. Reconnect always receives a newly computed full result rather than non-durable replay.
+- Give each client one replaceable pending full result, not an unbounded queue. Disconnect a persistently slow consumer so it can reconnect to current state.
+- Preserve selected asset, side, amount, focus, and scroll. Update the TanStack Query cache from SSE. The existing REST endpoint remains bootstrap and rollback; REST fallback cannot make an unhealthy live book eligible.
+
+SSE is accepted because delivery is one-way and full-state based. Browser WebSocket adds an unnecessary bidirectional protocol, while 15-second polling adds avoidable latency and load.
 
 ## Contracts and data
 
@@ -242,7 +328,60 @@ VenueEstimate {
 }
 ```
 
-Raw venue payload retention is off by default except for bounded, access-controlled diagnostic samples. Normalized history retention and downsampling require a cost and product decision. Schema versions are additive where possible; breaking changes use a new version with dual-read migration.
+The Markets API is a read-model boundary, not a pass-through proxy. All pair parameters use canonical `BASE-IDR` identity internally even though the client route is lower-case. Proposed version-1 resources are:
+
+| Endpoint | Purpose and bounds | Cache/failure contract |
+| --- | --- | --- |
+| `GET /api/markets?quote=IDR&limit=100&cursor=...` | Paginated overview, stable canonical sort, per-venue ticker and health; `limit` max 100 | BFF ticker snapshot/single-flight cache; HTTP `no-store`; partial venue states in a successful response |
+| `GET /api/markets/:pair` | Phase-1 bounded snapshot: pair identity plus per-venue ticker, order book, recent trades, OHLC, component availability, and health | HTTP `no-store`; adapters settle independently; valid but unknown pair is `404 MARKET_NOT_FOUND` |
+| `GET /api/markets/:pair/order-books?depth=20` | Follow-up projection: canonical bids/asks plus spread, midpoint and comparable cumulative liquidity; depth max 100 | Independent response and health, HTTP `no-store` |
+| `GET /api/markets/:pair/trades?window=15m&limit=50` | Follow-up projection: bounded recent trades and same-window activity metrics; limit max 100 and allowlisted windows | Independent response and coverage metadata, HTTP `no-store` |
+| `GET /api/markets/:pair/candles?interval=1h&range=24h` | Follow-up projection: per-venue OHLCV, common baseline, and normalized percentage-close overlay; max 500 buckets per venue | Closed history may use `ETag`; a partial current bucket and health are always explicit |
+
+An endpoint returns `200` when its projection was built even if one or all venue entries are unavailable; each venue carries its own status and reason. `400 INVALID_REQUEST` is used for malformed pair/query values, `404 MARKET_NOT_FOUND` for a valid canonical pair absent from the registry, `422 UNSUPPORTED_COMBINATION` for a known pair with an unsupported interval/range, `429` for product API rate limiting, and `503 SERVICE_UNAVAILABLE` only when the BFF cannot build the projection itself. Error bodies retain the existing `{ error: { code, message, details? } }` envelope.
+
+The phase-1 aggregate is a snapshot/read-model convenience, not a new canonical domain object and not an invitation to call venues from the browser. Its book and trade limits and fixed candle interval/range are server constants until query bounds are implemented. Because one response waits for all bounded component attempts and refreshes them at one client cadence, a slow component can increase whole-detail latency and unchanged candles may be transferred as often as ticker/book data. These are accepted residual risks for the initial read-only release. Metrics for component latency, response size, and retry waste trigger extraction to the follow-up capability endpoints; a component must already fail independently inside the aggregate so extraction does not change its domain semantics.
+
+Core canonical additions are:
+
+```text
+CanonicalTicker {
+  venue, marketSegment, venueSymbol, canonicalInstrument
+  lastPrice?, openPrice?, highPrice?, lowPrice?, bestBid?, bestAsk?
+  baseVolume?, quoteVolume?, windowStartAt?, windowDuration?
+  sourceEventAt?, receivedAt, status, statusReason?
+}
+
+CanonicalTrade {
+  venue, marketSegment, venueSymbol, canonicalInstrument
+  tradeId?, eventAt, price, baseQuantity, quoteNotional
+  aggressorSide                 // BUY | SELL | UNKNOWN
+  granularity                   // RAW | AGGREGATED
+  sourceEventAt?, receivedAt
+}
+
+CanonicalCandle {
+  venue, marketSegment, canonicalInstrument, interval
+  openTime, closeTime, open, high, low, close
+  baseVolume?, quoteVolume?, tradeCount?
+  isClosed, coverageStatus      // COMPLETE | PARTIAL
+  provenance                   // NATIVE | AGGREGATED_TRADES | AGGREGATED_TICKS
+  sourceEventAt?, receivedAt
+}
+
+CandleComparison {
+  schemaVersion, instrument, interval, range, generatedAt
+  commonBaselineAt?
+  series[] {
+    venue, status, exclusionReason?, baselinePrice?, coverageStartAt?, coverageEndAt?
+    points[] { openTime, open, high, low, close, normalizedChangePercent?, isClosed, coverageStatus }
+  }
+}
+```
+
+Order-book summaries use fixed economic bands around a validated midpoint (for example cumulative IDR liquidity within 10/25/50 basis points), not only a fixed count of rows. Raw levels remain venue-specific observations. All decimal values are canonical strings; normalized percentage values are calculated with decimal arithmetic and serialized as decimal strings.
+
+Raw venue payload retention is off by default except for bounded, access-controlled diagnostic samples. Normalized candles are retained for at least the largest released chart range plus a late-arrival/recovery margin; rollout cannot advertise a range for which known coverage does not exist. Longer history and downsampling require a cost and product decision. Schema versions are additive where possible; breaking changes use a new version with dual-read migration.
 
 ## Security and privacy
 
@@ -250,6 +389,8 @@ Raw venue payload retention is off by default except for bounded, access-control
 - Exchange responses are untrusted input. Enforce response-size limits, runtime schemas, numeric bounds, URL allowlists, TLS verification, and timeouts.
 - Venue base URLs and symbol routing come from reviewed server configuration, not end-user input, preventing server-side request forgery.
 - Public API abuse is controlled with user-level rate limits, request bounds, caching, and protection against arbitrary pair fan-out.
+- Market paths are parsed into canonical symbols and looked up in the registry. User input never selects an upstream hostname, raw venue symbol, Tokocrypto segment, or arbitrary time range. Pair length, depth, trade limit, interval, range, cursor, and response size are bounded before any adapter call.
+- The web application uses a restrictive Content Security Policy appropriate to its chart implementation. Chart labels and exchange-sourced names are rendered as text, external venue links use reviewed templates with `noopener noreferrer`, and no raw upstream HTML or image URL is trusted by default.
 - Diagnostic payloads are sampled and bounded. Headers, query parameters, tokens, cookies, and future credentials are redacted before logging.
 - Alert configuration and delivery destinations are user data and follow the product privacy and deletion policy once defined.
 - If Portfolio or Execution is added later, it must use a separate credential service and trust boundary. The public market-data workers must never receive private API secrets.
@@ -267,6 +408,7 @@ Required metrics include:
 - REST latency, response codes, Tokocrypto used-weight headers, `Retry-After`, and circuit state;
 - synchronized/fresh instrument count and comparison-eligible venue count;
 - estimate latency, insufficient-depth rate, suppressed rankings, and suppressed alerts.
+- Markets endpoint latency and cache hit/single-flight rate by projection; overview pair count and payload size; per-capability stale/unavailable ratio; candle gaps, partial buckets, common-baseline exclusion, history coverage, and points returned; client panel error and retry rate.
 
 Alerts should cover loss of all data for a venue, elevated stale-book ratio, repeated sequence gaps, schema-rejection spikes, sustained rate limiting, catalog mapping changes, and comparison eligibility falling below two venues for critical instruments.
 
@@ -274,12 +416,26 @@ Runbooks are required for venue outage, WebSocket reconnect storm, sequence-gap 
 
 ## Delivery and migration
 
+WebSocket delivery order is fixed:
+
+1. Add deterministic clocks/schedulers, connection epochs, health transitions, `LiveBookStore`, and replay fixtures while REST remains user-visible.
+2. Add Indodax and Reku full-snapshot workers in shadow mode; prove isolation, recovery, heartbeat, REST correlation, and resource bounds.
+3. Add Tokocrypto type-1 sequencing in shadow mode; leave type 3 on `REST_POLL`.
+4. Add SSE and client cache replacement behind a feature flag, retaining `/api/comparisons` for bootstrap and rollback.
+5. Complete the 72-hour shadow gate, then cut over one allowlisted IDR pair at a time. Rollback disables that pair/capability, invalidates its live record, and returns the UI to labeled REST behavior.
+
+Graceful shutdown marks readiness false, stops new SSE subscriptions, invalidates live state, unsubscribes/leaves where possible, closes venue sockets, and terminates. Restart never bridges connection epochs.
+
 1. **Contract harness:** Capture representative fixtures from the supplied documentation, define runtime schemas, implement decimal and canonical-symbol tests, and record unresolved contract contradictions.
 2. **Shadow adapters:** Implement discovery and public REST snapshots for all venues. Run without user-visible rankings and measure schema validity, pair overlap, timestamps, rate behavior, and depth completeness.
 3. **Live books:** Add WebSocket workers and per-capability state builders. For Tokocrypto type 1, implement and fault-inject the documented snapshot/delta sequence algorithm. Treat type 3 separately until its production semantics are verified.
 4. **Read-only beta:** Enable comparison behind a feature flag for a small verified IDR pair allowlist. Display status, time, gross estimate, insufficient depth, and fee provenance.
-5. **Alerts and history:** Enable only after freshness suppression, persistence rules, replay, and operational alerting pass.
-6. **Coverage expansion:** Move pairs from `UNVERIFIED` through shadow validation into the eligible catalog. Rollback removes a pair, segment, or venue capability through configuration without changing canonical contracts.
+5. **Markets overview:** Add batched ticker capabilities and the union browse projection. Enable `/markets` only after all-pair requests are shown not to create upstream N+1 load.
+6. **Pair detail phase 1:** Add the bounded aggregated snapshot with independently settled ticker, order-book, recent-trade, and candle components. Missing components remain explicit instead of blocking the route.
+7. **Capability extraction:** Measure component latency, payload size, refresh waste, and failure coupling. Extract order-book, trades, and candles to their bounded endpoints when thresholds or richer range/interval controls justify separate cadence.
+8. **Comparative history:** Backfill where a verified native endpoint permits it, begin bounded collection where it does not, and enable each range only after coverage and gap evidence pass. The overlay transform is enabled only with a shared baseline.
+9. **Alerts and longer history:** Enable only after freshness suppression, persistence rules, replay, and operational alerting pass.
+10. **Coverage expansion:** Move pairs from `UNVERIFIED` through shadow validation into the browse union and, separately, the effective-price intersection. Rollback removes a pair, segment, venue capability, or Markets panel through configuration without changing canonical contracts.
 
 No private API or execution code is included in these phases. A separate architecture decision is required before expanding the trust boundary.
 
@@ -297,8 +453,19 @@ No private API or execution code is included in these phases. A separate archite
 | Reku and some other book streams lack documented sequence semantics             | Undetected message loss could leave a plausible but wrong book | Market-data engineering             | Prefer atomic snapshots where documented and periodically refresh via REST                                |
 | Stablecoin and IDR markets are not directly comparable                          | False arbitrage signals                                        | Product and CTO                     | Keep MVP IDR-only; require a separate explicit FX-route design later                                      |
 | Historical storage granularity and retention are undecided                      | Cost and product capability uncertainty                        | Product and CTO                     | Measure volume, define use cases, and approve retention before persistence expansion                      |
+| Indodax supplied docs expose chart ticks but no historical OHLC REST endpoint   | Requested ranges may be unavailable until enough data is collected | Market-data engineering and Product | Aggregate verified ticks/trades, expose coverage start/gaps, and gate ranges rather than fabricate backfill |
+| Venue 24-hour windows and trade feed granularity may differ                     | Ticker and activity values may look directly comparable when they are not | Market-data engineering and Product | Preserve window/granularity provenance; compare only same-window derived metrics and label exceptions      |
+| Three overlay series can begin at different available times                     | Independent rebasing would create a misleading movement comparison | Application engineering             | Require one common closed baseline bucket; exclude or gap incomplete series                               |
+| All-market overview could cause upstream request fan-out                        | Rate limiting, latency, or venue bans                           | Platform engineering                | Require batched venue capabilities, cache/single-flight, pagination, payload budgets, and load tests       |
+| Phase-1 detail aggregates capabilities with unlike size and cadence             | A slow component delays the snapshot and static OHLC may be retransferred with fast data | Application engineering | Keep bounded independent settlement and component timings; extract endpoints when latency/payload/retry thresholds are exceeded |
 
 ## Verification
+
+- Indodax protocol tests cover handshake, subscribe/ping acknowledgments, atomic full replacement, epoch, duplicate/regressing offsets, contiguous recovery, and clean-snapshot fallback.
+- Reku protocol tests cover Phoenix join/leave/error/heartbeat, coin-ID validation, full replacement, reconnect invalidation, receive-time disclosure, and REST mismatch quarantine.
+- Tokocrypto type-1 replay covers snapshot race, stale/overlap/duplicate/gap/reorder `U/u`, zero deletion, overflow, reconnect, ping/pong, and planned 24-hour renewal. Configuration tests prove type 3 cannot register a WebSocket or type-1 builder.
+- Live-store tests cover atomic revision publication, one writer, old-epoch rejection, health mapping, shutdown/restart invalidation, and zero unhealthy books ranked.
+- SSE integration and Playwright tests cover initial/replacement results, coalescing, slow consumer, stale/gap removal, reconnect refetch, partial availability, preserved input/focus, reduced motion, and absence of exchange URLs/tokens in browser traffic.
 
 - Runtime contract tests for every documented response variant and malformed, missing, additional, or type-shifted fields.
 - Property tests for decimal parsing, precision, order-book sorting, weighted average price, slippage, insufficient liquidity, and fee calculations.
@@ -311,6 +478,11 @@ No private API or execution code is included in these phases. A separate archite
 - Crossed-book, negative quantity, timestamp regression, clock-skew, stale-state, and schema-quarantine tests.
 - Adapter integration tests for HTTP 429/418/5XX, `Retry-After`, partial responses, timeouts, WebSocket ping/pong, 24-hour reconnect, and catalog changes.
 - End-to-end browser coverage for healthy comparison, single-venue failure, fewer-than-two venues, stale data, insufficient depth, fee uncertainty, loading, empty, and error states.
+- Route tests for `/markets`, canonical `/markets/btc-idr`, upper-case normalization, malformed pairs, unknown valid pairs, deep-link reload, browser back/forward, focus restoration, and route-level not found. Search-parameter validation is added when range/interval becomes URL state and triggers router adoption.
+- Contract tests for overview pagination and deterministic sorting; per-venue partial failure; ticker window provenance; bounded order-book depth; trade limits, granularity, deduplication, and taker-side mapping; and stable API error envelopes.
+- Candle fixtures prove each venue's field order and seconds/milliseconds conversion. Aggregation tests cover UTC interval boundaries, duplicate and out-of-order trades/ticks, reconnect gaps, open versus closed buckets, volume, and `PARTIAL` coverage.
+- Comparative-chart property tests prove one shared baseline, `baseline -> 0%`, exact decimal percentage calculation, no interpolation, deterministic exclusions, and a 500-point-per-venue ceiling. Visual/accessibility tests expose the same raw OHLC and normalized movement without relying on color or hover.
+- Performance tests prove overview ingestion uses at most one batched ticker operation per venue per refresh, identical concurrent requests are single-flighted, hidden/offline clients stop polling, payload budgets hold at the maximum page/depth/range, and one failing venue does not delay healthy venue responses beyond the configured timeout.
 - Accessibility checks for keyboard use, screen-reader status, non-color indicators, and reduced motion.
 - A 72-hour shadow-ingestion report containing environment, scope, pair coverage, gaps, schema failures, rate-limit observations, freshness distributions, and residual risks.
 - A threat-model review confirming that the MVP contains no exchange credential path and that endpoint configuration cannot be user-controlled.

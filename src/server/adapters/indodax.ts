@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import Decimal from 'decimal.js';
 import { validateBook } from '@server/domain/orderbook.js';
 import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
 import { decimalPlacesRule, stepRule } from '@server/domain/increments.js';
 import { fetchPublicJson, nowIso } from './http.js';
 
@@ -25,6 +27,38 @@ const depthSchema = z.object({
   buy: z.array(z.tuple([z.string(), z.string()])),
   sell: z.array(z.tuple([z.string(), z.string()])),
 });
+
+const tickerSchema = z
+  .object({
+    high: z.string(),
+    low: z.string(),
+    last: z.string(),
+    buy: z.string(),
+    sell: z.string(),
+    server_time: z.string(),
+    vol_idr: z.string().optional(),
+  })
+  .passthrough();
+const tickerAllSchema = z.object({ tickers: z.record(tickerSchema) });
+const tradesSchema = z.array(
+  z.object({
+    tid: z.string(),
+    type: z.enum(['buy', 'sell']),
+    price: z.string(),
+    amount: z.string(),
+    date: z.string(),
+  }),
+);
+const candlesSchema = z.array(
+  z.object({
+    Time: z.string(),
+    Open: z.string(),
+    High: z.string(),
+    Low: z.string(),
+    Close: z.string(),
+    Volume: z.string().optional(),
+  }),
+);
 
 export class IndodaxAdapter implements VenueAdapter {
   readonly venue = 'INDODAX' as const;
@@ -71,5 +105,66 @@ export class IndodaxAdapter implements VenueAdapter {
       freshnessIndependentlyVerified: false,
       synchronization: 'SNAPSHOT',
     });
+  }
+
+  async listTickers(signal?: AbortSignal): Promise<MarketTicker[]> {
+    const raw = tickerAllSchema.parse(
+      await fetchPublicJson(new URL('https://indodax.com/api/ticker_all'), HOSTS, signal),
+    );
+    const receivedAt = nowIso();
+    return Object.entries(raw.tickers)
+      .filter(([symbol]) => symbol.toLowerCase().endsWith('_idr'))
+      .map(([symbol, ticker]) => ({
+        venue: this.venue,
+        venueSymbol: symbol,
+        lastPrice: ticker.last,
+        bestBid: ticker.buy,
+        bestAsk: ticker.sell,
+        high24h: ticker.high,
+        low24h: ticker.low,
+        baseVolume24h: ticker[`vol_${symbol.slice(0, -4).toLowerCase()}`] as string | undefined,
+        quoteVolume24h: ticker.vol_idr,
+        sourceEventAt: new Date(new Decimal(ticker.server_time).mul(1000).toNumber()).toISOString(),
+        receivedAt,
+      }));
+  }
+
+  async getTrades(asset: string, signal?: AbortSignal): Promise<MarketTrade[]> {
+    const venueSymbol = `${asset.toLowerCase()}idr`;
+    const raw = tradesSchema.parse(
+      await fetchPublicJson(
+        new URL(`/api/trades/${venueSymbol}`, 'https://indodax.com'),
+        HOSTS,
+        signal,
+      ),
+    );
+    return raw.slice(0, 50).map((trade) => ({
+      id: trade.tid,
+      price: trade.price,
+      quantity: trade.amount,
+      side: trade.type,
+      occurredAt: new Date(new Decimal(trade.date).mul(1000).toNumber()).toISOString(),
+    }));
+  }
+
+  async getCandles(asset: string, signal?: AbortSignal): Promise<MarketCandle[]> {
+    const now = Math.floor(Date.now() / 1000);
+    const url = new URL('https://indodax.com/tradingview/history_v2');
+    url.searchParams.set('from', String(now - 25 * 60 * 60));
+    url.searchParams.set('to', String(now));
+    url.searchParams.set('tf', '60');
+    url.searchParams.set('symbol', `${asset.toUpperCase()}IDR`);
+    const raw = candlesSchema.parse(await fetchPublicJson(url, HOSTS, signal));
+    return raw.slice(-24).map((candle) => ({
+      openedAt: new Date(new Decimal(candle.Time).mul(1000).toNumber()).toISOString(),
+      closedAt: new Date(
+        new Decimal(candle.Time).mul(1000).plus(3_599_999).toNumber(),
+      ).toISOString(),
+      open: candle.Open,
+      high: candle.High,
+      low: candle.Low,
+      close: candle.Close,
+      baseVolume: candle.Volume,
+    }));
   }
 }

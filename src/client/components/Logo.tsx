@@ -1,9 +1,9 @@
 export function Logo() {
   return (
     <a
-      href="#top"
+      href="/"
       className="group inline-flex items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/35"
-      aria-label="Komper Market Lens, ke atas"
+      aria-label="Komper Market Lens, beranda"
     >
       <span
         className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-coral text-white shadow-lg shadow-coral/20"

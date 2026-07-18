@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
-import type { Venue } from '@shared/contracts.js';
+import type { MarketCandle, MarketTicker, MarketTrade, Venue } from '@shared/contracts.js';
 import { stepRule } from '@server/domain/increments.js';
 
 export const FIXTURE_ASSETS = [
@@ -93,6 +93,65 @@ export class FixtureAdapter implements VenueAdapter {
       book.bids[0].price = ask.mul('1.1').toFixed();
     }
     return book;
+  }
+
+  async listTickers(): Promise<MarketTicker[]> {
+    const receivedAt = new Date().toISOString();
+    return FIXTURE_ASSETS.map((asset) => {
+      const reference = new Decimal(BASE_PRICES[asset] ?? '10000').mul(VENUE_FACTOR[this.venue]);
+      return {
+        venue: this.venue,
+        venueSymbol: this.symbol(asset),
+        lastPrice: reference.toFixed(2),
+        bestBid: reference.mul('0.999').toFixed(2),
+        bestAsk: reference.mul('1.001').toFixed(2),
+        high24h: reference.mul('1.025').toFixed(2),
+        low24h: reference.mul('0.975').toFixed(2),
+        open24h: reference.mul('0.992').toFixed(2),
+        priceChangePercent24h: '0.81',
+        baseVolume24h: '125.5',
+        quoteVolume24h: reference.mul('125.5').toFixed(2),
+        sourceEventAt: receivedAt,
+        receivedAt,
+      };
+    });
+  }
+
+  async getTrades(asset: string): Promise<MarketTrade[]> {
+    const reference = new Decimal(BASE_PRICES[asset] ?? '10000').mul(VENUE_FACTOR[this.venue]);
+    const now = Date.now();
+    return Array.from({ length: 12 }, (_, index) => ({
+      id: `${this.venue}-${asset}-${index}`,
+      price: reference.mul(new Decimal(1).plus(new Decimal(index - 6).mul('0.0004'))).toFixed(2),
+      quantity: new Decimal('0.02').mul(index + 1).toFixed(4),
+      side: index % 3 === 0 ? ('sell' as const) : ('buy' as const),
+      occurredAt: new Date(now - index * 90_000).toISOString(),
+    }));
+  }
+
+  async getCandles(asset: string): Promise<MarketCandle[]> {
+    const reference = new Decimal(BASE_PRICES[asset] ?? '10000').mul(VENUE_FACTOR[this.venue]);
+    const venueOffset = this.venue === 'INDODAX' ? 0 : this.venue === 'REKU' ? 1 : 2;
+    const latestClosedHour = Math.floor(Date.now() / 3_600_000) * 3_600_000 - 3_600_000;
+    return Array.from({ length: 24 }, (_, index) => {
+      const openedAt = latestClosedHour - (23 - index) * 3_600_000;
+      const movement = new Decimal(index - 12)
+        .mul('0.0007')
+        .plus(new Decimal(((index + venueOffset) % 5) - 2).mul('0.0012'));
+      const open = reference.mul(new Decimal(1).plus(movement));
+      const close = open.mul(new Decimal(1).plus(new Decimal((index % 3) - 1).mul('0.0008')));
+      return {
+        openedAt: new Date(openedAt).toISOString(),
+        closedAt: new Date(openedAt + 3_599_999).toISOString(),
+        open: open.toFixed(2),
+        high: Decimal.max(open, close).mul('1.0015').toFixed(2),
+        low: Decimal.min(open, close).mul('0.9985').toFixed(2),
+        close: close.toFixed(2),
+        baseVolume: new Decimal(10 + index).toFixed(),
+        quoteVolume: reference.mul(10 + index).toFixed(2),
+        tradeCount: 20 + index,
+      };
+    });
   }
 
   private symbol(asset: string): string {

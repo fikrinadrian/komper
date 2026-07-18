@@ -37,6 +37,47 @@ describe('Market Lens BFF', () => {
     expect(sell.body.results[0].outcomeAsset).toBe('IDR');
   });
 
+  it('compares last prices for the market catalog across venues', async () => {
+    const response = await request(app).get('/api/markets').expect(200);
+    expect(response.body.schemaVersion).toBe('1');
+    expect(response.body.rows).toHaveLength(18);
+    const bitcoin = response.body.rows.find((row: { pair: string }) => row.pair === 'BTC-IDR');
+    expect(bitcoin.venues).toHaveLength(3);
+    expect(bitcoin.venues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ venue: 'INDODAX', status: 'AVAILABLE' }),
+        expect.objectContaining({ venue: 'REKU', status: 'AVAILABLE' }),
+        expect.objectContaining({ venue: 'TOKOCRYPTO', status: 'AVAILABLE' }),
+      ]),
+    );
+    expect(bitcoin.venues[0].ticker.lastPrice).toBeDefined();
+  });
+
+  it('returns pricing, books, public trades, and aligned OHLC inputs for market detail', async () => {
+    const response = await request(app).get('/api/markets/btc-idr').expect(200);
+    expect(response.body).toMatchObject({ pair: 'BTC-IDR', interval: '1h' });
+    expect(response.body.venues).toHaveLength(3);
+    for (const venue of response.body.venues) {
+      expect(venue.components).toMatchObject({
+        ticker: { status: 'AVAILABLE' },
+        orderBook: { status: 'AVAILABLE' },
+        trades: { status: 'AVAILABLE' },
+        candles: { status: 'AVAILABLE' },
+      });
+      expect(venue.ticker.lastPrice).toBeDefined();
+      expect(venue.orderBook.bids.length).toBeGreaterThan(0);
+      expect(venue.orderBook.asks.length).toBeGreaterThan(0);
+      expect(venue.trades.length).toBeGreaterThan(0);
+      expect(venue.candles).toHaveLength(24);
+    }
+  });
+
+  it('distinguishes malformed and unavailable market detail pairs', async () => {
+    await request(app).get('/api/markets/btc-usdt').expect(400);
+    const response = await request(app).get('/api/markets/nope-idr').expect(404);
+    expect(response.body.error.code).toBe('MARKET_NOT_FOUND');
+  });
+
   it('rejects invalid and unsupported requests without venue fan-out', async () => {
     await request(app).get('/api/comparisons?asset=BTC&side=buy&amount=-1').expect(400);
     const response = await request(app)

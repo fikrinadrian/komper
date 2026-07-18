@@ -1,4 +1,10 @@
-import type { IncrementRule, Venue } from '@shared/contracts.js';
+import type {
+  IncrementRule,
+  MarketCandle,
+  MarketTicker,
+  MarketTrade,
+  Venue,
+} from '@shared/contracts.js';
 
 export type BookLevel = { price: string; quantity: string };
 
@@ -37,4 +43,7 @@ export interface VenueAdapter {
   readonly venue: Venue;
   discover(signal?: AbortSignal): Promise<VenueInstrument[]>;
   getBook(asset: string, signal?: AbortSignal): Promise<CanonicalBook>;
+  listTickers?(signal?: AbortSignal): Promise<MarketTicker[]>;
+  getTrades?(asset: string, signal?: AbortSignal): Promise<MarketTrade[] | undefined>;
+  getCandles?(asset: string, signal?: AbortSignal): Promise<MarketCandle[]>;
 }

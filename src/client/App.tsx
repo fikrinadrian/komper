@@ -1,24 +1,48 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { Side } from '@shared/contracts.js';
-import { getCatalog, getComparison, track } from '@client/lib/api.js';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ComparisonResponse, Side } from '@shared/contracts.js';
+import {
+  getCatalog,
+  getComparison,
+  subscribeLiveComparison,
+  track,
+  type LiveConnectionState,
+} from '@client/lib/api.js';
 import { sizeBucket } from '@client/lib/format.js';
 import { ComparisonForm } from '@client/components/ComparisonForm.js';
 import { Logo } from '@client/components/Logo.js';
 import { Results } from '@client/components/Results.js';
+import { MarketDetailPage, MarketsPage } from '@client/components/MarketPages.js';
 
 type Submitted = { asset: string; side: Side; amount: string };
 
-export function App() {
+function LandingPage() {
+  const queryClient = useQueryClient();
   const [submitted, setSubmitted] = useState<Submitted>();
+  const [liveState, setLiveState] = useState<LiveConnectionState>();
   const trackedUpdate = useRef(0);
+  const liveEnabled = import.meta.env.VITE_LIVE_COMPARISONS === 'true';
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: getCatalog, staleTime: 30_000 });
   const comparison = useQuery({
     queryKey: ['comparison', submitted],
     queryFn: () => getComparison(submitted!),
     enabled: Boolean(submitted),
-    refetchInterval: submitted ? 15_000 : false,
+    refetchInterval: submitted && (!liveEnabled || liveState === 'reconnecting') ? 15_000 : false,
   });
+
+  useEffect(() => {
+    if (!submitted || !liveEnabled) {
+      setLiveState(undefined);
+      return;
+    }
+    return subscribeLiveComparison(
+      submitted,
+      (next) => {
+        queryClient.setQueryData<ComparisonResponse>(['comparison', submitted], next);
+      },
+      setLiveState,
+    );
+  }, [liveEnabled, queryClient, submitted]);
 
   useEffect(() => {
     const updateAt = comparison.dataUpdatedAt || comparison.errorUpdatedAt;
@@ -58,6 +82,9 @@ export function App() {
   }
 
   const sourceProblems = catalog.data?.sourceStatus.filter((source) => !source.ok) ?? [];
+  const requestedAsset = new URLSearchParams(window.location.search).get('asset')?.toUpperCase();
+  const initialAsset =
+    requestedAsset && /^[A-Z0-9]{2,12}$/.test(requestedAsset) ? requestedAsset : 'BTC';
   return (
     <div id="top" className="min-h-screen bg-cream text-ink">
       <header className="relative overflow-hidden bg-navy text-white">
@@ -68,6 +95,12 @@ export function App() {
         >
           <Logo />
           <div className="flex items-center gap-5 text-sm font-bold text-white/75">
+            <a
+              href="/markets"
+              className="rounded-md hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40"
+            >
+              Markets
+            </a>
             <a
               href="#methodology"
               className="hidden rounded-md hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40 sm:inline"
@@ -130,6 +163,7 @@ export function App() {
             {catalog.data && (
               <ComparisonForm
                 instruments={catalog.data.instruments}
+                initialAsset={initialAsset}
                 pending={comparison.isFetching}
                 onSubmit={submit}
               />
@@ -170,6 +204,15 @@ export function App() {
           </div>
         )}
         {comparison.data && <Results comparison={comparison.data} />}
+        {submitted && liveEnabled && (
+          <p className="mt-3 text-sm text-slate-600" role="status" aria-live="polite">
+            {liveState === 'live'
+              ? 'Pembaruan live tersambung.'
+              : liveState === 'reconnecting'
+                ? 'Pembaruan live terputus; mencoba menyambung kembali tanpa menghapus input.'
+                : 'Menyambungkan pembaruan live...'}
+          </p>
+        )}
         {!submitted && catalog.data && (
           <section className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
             <p className="text-lg font-extrabold">
@@ -245,4 +288,69 @@ export function App() {
       </footer>
     </div>
   );
+}
+
+function currentRoute(): { page: 'landing' | 'markets' | 'detail' | 'not-found'; pair?: string } {
+  const path = window.location.pathname;
+  if (/^\/markets\/?$/i.test(path)) {
+    if (path !== '/markets')
+      window.history.replaceState(null, '', `/markets${window.location.search}`);
+    return { page: 'markets' };
+  }
+
+  const detail = /^\/markets\/([^/]+)\/?$/i.exec(path);
+  if (detail) {
+    let pair: string;
+    try {
+      pair = decodeURIComponent(detail[1]).toLowerCase();
+    } catch {
+      return { page: 'not-found' };
+    }
+    if (/^[a-z0-9]{2,12}-idr$/.test(pair)) {
+      const canonicalPath = `/markets/${pair}`;
+      if (path !== canonicalPath) {
+        window.history.replaceState(null, '', `${canonicalPath}${window.location.search}`);
+      }
+      return { page: 'detail', pair };
+    }
+    return { page: 'not-found' };
+  }
+
+  if (path !== '/') return { page: 'not-found' };
+  return { page: 'landing' };
+}
+
+function NotFoundPage() {
+  return (
+    <div className="grid min-h-screen place-items-center bg-cream px-5 text-ink">
+      <main className="max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-panel">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-coral">404 · Not found</p>
+        <h1 className="mt-3 text-3xl font-black tracking-[-0.04em]">Route market tidak valid</h1>
+        <p className="mt-3 leading-7 text-slate-600">
+          Gunakan pair spot IDR dalam format seperti <span className="font-bold">btc-idr</span>.
+        </p>
+        <a
+          href="/markets"
+          className="mt-6 inline-flex rounded-xl bg-navy px-5 py-3 text-sm font-extrabold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/30"
+        >
+          Kembali ke Markets
+        </a>
+      </main>
+    </div>
+  );
+}
+
+export function App() {
+  const [route, setRoute] = useState(currentRoute);
+
+  useEffect(() => {
+    const handlePopState = () => setRoute(currentRoute());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  if (route.page === 'markets') return <MarketsPage />;
+  if (route.page === 'detail' && route.pair) return <MarketDetailPage pair={route.pair} />;
+  if (route.page === 'not-found') return <NotFoundPage />;
+  return <LandingPage />;
 }

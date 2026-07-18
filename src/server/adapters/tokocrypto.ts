@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import Decimal from 'decimal.js';
 import { validateBook } from '@server/domain/orderbook.js';
 import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
 import { stepRule, unverifiedRule } from '@server/domain/increments.js';
 import { fetchPublicJson, nowIso } from './http.js';
 
@@ -41,6 +43,69 @@ const depthPayloadSchema = z.object({
 const wrappedDepthSchema = z.union([
   depthPayloadSchema,
   z.object({ code: z.string(), data: depthPayloadSchema }),
+]);
+
+const tickerSchema = z.object({
+  symbol: z.string(),
+  lastPrice: z.string(),
+  bidPrice: z.string().optional(),
+  askPrice: z.string().optional(),
+  openPrice: z.string().optional(),
+  highPrice: z.string().optional(),
+  lowPrice: z.string().optional(),
+  priceChangePercent: z.string().optional(),
+  volume: z.string().optional(),
+  quoteVolume: z.string().optional(),
+  closeTime: z.string().optional(),
+});
+const tickersSchema = z.array(tickerSchema);
+
+const tradeSchema = z.object({
+  id: z.string(),
+  price: z.string(),
+  qty: z.string(),
+  time: z.string(),
+  isBuyerMaker: z.boolean(),
+});
+const aggregateTradeSchema = z.object({
+  a: z.string(),
+  p: z.string(),
+  q: z.string(),
+  T: z.string(),
+  m: z.boolean(),
+});
+const tradesSchema = z.union([
+  z.array(tradeSchema),
+  z.object({ data: z.array(tradeSchema) }).transform((item) => item.data),
+]);
+const aggregateTradesSchema = z.union([
+  z.array(aggregateTradeSchema),
+  z.object({ data: z.array(aggregateTradeSchema) }).transform((item) => item.data),
+]);
+
+const candleTupleSchema = z.tuple([
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+  z.string(),
+]);
+const candleEntrySchema = z.union([
+  candleTupleSchema,
+  z
+    .object({ value: candleTupleSchema, Count: z.string().optional() })
+    .transform((item) => item.value),
+]);
+const candlesSchema = z.union([
+  z.array(candleEntrySchema),
+  z.object({ data: z.array(candleEntrySchema) }).transform((item) => item.data),
 ]);
 
 export class TokocryptoAdapter implements VenueAdapter {
@@ -106,8 +171,19 @@ export class TokocryptoAdapter implements VenueAdapter {
   }
 
   async getBook(asset: string, signal?: AbortSignal): Promise<CanonicalBook> {
+    return (await this.getDepthSnapshot(asset, signal)).book;
+  }
+
+  getMarketSegment(asset: string): string {
+    return this.segmentByAsset.get(asset.toUpperCase()) ?? 'spot-type-1';
+  }
+
+  async getDepthSnapshot(
+    asset: string,
+    signal?: AbortSignal,
+  ): Promise<{ lastUpdateId: string; book: CanonicalBook }> {
     const venueSymbol = `${asset.toUpperCase()}_IDR`;
-    const marketSegment = this.segmentByAsset.get(asset) ?? 'spot-type-1';
+    const marketSegment = this.getMarketSegment(asset);
     const isType3 = marketSegment === 'spot-type-3';
     const url = new URL(
       isType3
@@ -121,7 +197,7 @@ export class TokocryptoAdapter implements VenueAdapter {
     );
     const raw = 'data' in parsed ? parsed.data : parsed;
     const receivedAt = nowIso();
-    return validateBook({
+    const book = validateBook({
       schemaVersion: '1',
       venue: this.venue,
       marketSegment,
@@ -137,5 +213,90 @@ export class TokocryptoAdapter implements VenueAdapter {
       freshnessIndependentlyVerified: Boolean(raw.E),
       synchronization: 'SNAPSHOT',
     });
+    return { lastUpdateId: raw.lastUpdateId, book };
+  }
+
+  async listTickers(signal?: AbortSignal): Promise<MarketTicker[]> {
+    const raw = tickersSchema.parse(
+      await fetchPublicJson(
+        new URL('https://www.tokocrypto.site/api/v3/ticker/24hr'),
+        DEPTH_HOSTS,
+        signal,
+      ),
+    );
+    const receivedAt = nowIso();
+    return raw
+      .filter((ticker) => ticker.symbol.endsWith('IDR'))
+      .map((ticker) => ({
+        venue: this.venue,
+        venueSymbol: ticker.symbol,
+        lastPrice: ticker.lastPrice,
+        bestBid: ticker.bidPrice,
+        bestAsk: ticker.askPrice,
+        high24h: ticker.highPrice,
+        low24h: ticker.lowPrice,
+        open24h: ticker.openPrice,
+        priceChangePercent24h: ticker.priceChangePercent,
+        baseVolume24h: ticker.volume,
+        quoteVolume24h: ticker.quoteVolume,
+        sourceEventAt: ticker.closeTime
+          ? new Date(new Decimal(ticker.closeTime).toNumber()).toISOString()
+          : undefined,
+        receivedAt,
+      }));
+  }
+
+  async getTrades(asset: string, signal?: AbortSignal): Promise<MarketTrade[]> {
+    const marketSegment = this.segmentByAsset.get(asset) ?? 'spot-type-1';
+    const isType3 = marketSegment === 'spot-type-3';
+    const url = new URL(
+      isType3
+        ? 'https://cloudme-toko.2meta.app/api/v1/aggTrades'
+        : 'https://www.tokocrypto.site/api/v3/trades',
+    );
+    url.searchParams.set('symbol', `${asset.toUpperCase()}IDR`);
+    url.searchParams.set('limit', '50');
+    const raw = await fetchPublicJson(url, isType3 ? TYPE_3_DEPTH_HOSTS : DEPTH_HOSTS, signal);
+    if (isType3) {
+      return aggregateTradesSchema.parse(raw).map((trade) => ({
+        id: trade.a,
+        price: trade.p,
+        quantity: trade.q,
+        occurredAt: new Date(new Decimal(trade.T).toNumber()).toISOString(),
+      }));
+    }
+    return tradesSchema.parse(raw).map((trade) => ({
+      id: trade.id,
+      price: trade.price,
+      quantity: trade.qty,
+      occurredAt: new Date(new Decimal(trade.time).toNumber()).toISOString(),
+    }));
+  }
+
+  async getCandles(asset: string, signal?: AbortSignal): Promise<MarketCandle[]> {
+    const marketSegment = this.segmentByAsset.get(asset) ?? 'spot-type-1';
+    const isType3 = marketSegment === 'spot-type-3';
+    const url = new URL(
+      isType3
+        ? 'https://cloudme-toko.2meta.app/api/v1/klines'
+        : 'https://www.tokocrypto.site/api/v3/klines',
+    );
+    url.searchParams.set('symbol', `${asset.toUpperCase()}IDR`);
+    url.searchParams.set('interval', '1h');
+    url.searchParams.set('limit', '24');
+    const raw = candlesSchema.parse(
+      await fetchPublicJson(url, isType3 ? TYPE_3_DEPTH_HOSTS : DEPTH_HOSTS, signal),
+    );
+    return raw.slice(-24).map((candle) => ({
+      openedAt: new Date(new Decimal(candle[0]).toNumber()).toISOString(),
+      closedAt: new Date(new Decimal(candle[6]).toNumber()).toISOString(),
+      open: candle[1],
+      high: candle[2],
+      low: candle[3],
+      close: candle[4],
+      baseVolume: candle[5],
+      quoteVolume: candle[7],
+      tradeCount: new Decimal(candle[8]).toNumber(),
+    }));
   }
 }

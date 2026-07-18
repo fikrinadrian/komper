@@ -19,6 +19,14 @@ function normalizeJsonNumbers(value: unknown): unknown {
   return value;
 }
 
+export function parsePublicJsonText(text: string): unknown {
+  try {
+    return normalizeJsonNumbers(parser.parse(text));
+  } catch {
+    throw new Error('upstream_invalid_json');
+  }
+}
+
 export async function fetchPublicJson(
   url: URL,
   allowedHosts: readonly string[],
@@ -42,11 +50,7 @@ export async function fetchPublicJson(
   if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
     throw new Error('upstream_response_too_large');
   }
-  try {
-    return normalizeJsonNumbers(parser.parse(text));
-  } catch {
-    throw new Error('upstream_invalid_json');
-  }
+  return parsePublicJsonText(text);
 }
 
 export function nowIso(): string {

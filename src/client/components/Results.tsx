@@ -62,6 +62,12 @@ function Freshness({ estimate }: { estimate: VenueEstimate }) {
             ? 'waktu sumber dapat diverifikasi'
             : 'berdasarkan waktu terima server'}
         </span>
+        {estimate.transport && (
+          <span className="block">
+            {estimate.transport} / {estimate.synchronization ?? 'SNAPSHOT'}
+            {estimate.liveRevision ? ` / revisi ${estimate.liveRevision}` : ''}
+          </span>
+        )}
       </span>
     </div>
   );

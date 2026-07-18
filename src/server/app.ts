@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { ZodError, z } from 'zod';
 import { comparisonRequestSchema } from '@shared/contracts.js';
 import { createServices } from './services/market-data.js';
+import { serveComparisonSse } from './live/sse.js';
 
 type Services = ReturnType<typeof createServices>;
 
@@ -20,6 +21,12 @@ const eventSchema = z.object({
   venue: z.enum(['INDODAX', 'REKU', 'TOKOCRYPTO']).optional(),
   eligibleVenueCount: z.number().int().min(0).max(3).optional(),
 });
+
+const marketPairSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z0-9]{2,12}-IDR$/);
 
 export function createApp(services: Services = createServices('live')) {
   const app = express();
@@ -54,6 +61,40 @@ export function createApp(services: Services = createServices('live')) {
         amount: request.query.amount,
       });
       const result = await services.comparison.compare(input.asset, input.side, input.amount);
+      response.setHeader('Cache-Control', 'no-store');
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/live/comparisons', async (request, response, next) => {
+    try {
+      const input = comparisonRequestSchema.parse({
+        asset: request.query.asset,
+        side: request.query.side,
+        amount: request.query.amount,
+      });
+      await serveComparisonSse(request, response, input, services.comparison, services.live);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/markets', async (_request, response, next) => {
+    try {
+      const result = await services.markets.getOverview();
+      response.setHeader('Cache-Control', 'private, max-age=15');
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/markets/:pair', async (request, response, next) => {
+    try {
+      const pair = marketPairSchema.parse(request.params.pair);
+      const result = await services.markets.getDetail(pair.slice(0, -4));
       response.setHeader('Cache-Control', 'no-store');
       response.json(result);
     } catch (error) {
@@ -100,6 +141,12 @@ export function createApp(services: Services = createServices('live')) {
           code: 'UNSUPPORTED_INSTRUMENT',
           message: 'Pair IDR ini belum aktif dan tervalidasi di ketiga exchange.',
         },
+      });
+      return;
+    }
+    if (error instanceof Error && error.message === 'unsupported_market') {
+      response.status(404).json({
+        error: { code: 'MARKET_NOT_FOUND', message: 'Pair market ini belum tersedia.' },
       });
       return;
     }

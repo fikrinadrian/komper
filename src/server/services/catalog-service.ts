@@ -36,7 +36,9 @@ export class CatalogService {
     const allAssets = new Set<string>();
     for (const instruments of this.instrumentsByVenue.values()) {
       for (const instrument of instruments) {
-        if (instrument.quoteAsset === 'IDR') allAssets.add(instrument.baseAsset);
+        if (instrument.quoteAsset === 'IDR' && instrument.directIdr && instrument.active) {
+          allAssets.add(instrument.baseAsset);
+        }
       }
     }
 

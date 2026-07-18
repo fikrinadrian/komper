@@ -10,6 +10,7 @@ import { decimal, plain } from '@server/domain/decimal.js';
 import { quantizeDown, unverifiedRule, validateBookIncrements } from '@server/domain/increments.js';
 import { validateBook, walkBuy, walkBuyQuantity, walkSell } from '@server/domain/orderbook.js';
 import type { VenueAdapter } from '@server/domain/types.js';
+import type { CanonicalBook } from '@server/domain/types.js';
 import { getFeeAssumption } from '@server/registry/fee-registry.js';
 import { CatalogService } from './catalog-service.js';
 
@@ -19,12 +20,28 @@ const EXTERNAL_URLS: Record<Venue, string> = {
   TOKOCRYPTO: 'https://www.tokocrypto.com/spot',
 };
 
+export type ComparisonBookResolution = {
+  book?: CanonicalBook;
+  status?: 'STALE' | 'UNSYNCED' | 'UNAVAILABLE';
+  reason?: string;
+  transport?: VenueEstimate['transport'];
+  synchronization?: VenueEstimate['synchronization'];
+  connectionEpoch?: number;
+  liveRevision?: number;
+};
+
+export type ComparisonBookResolver = (
+  adapter: VenueAdapter,
+  asset: string,
+) => Promise<ComparisonBookResolution | undefined>;
+
 export class ComparisonService {
   constructor(
     private readonly adapters: VenueAdapter[],
     private readonly catalog: CatalogService,
     private readonly staleAfterMs = 15_000,
     private readonly feeLookup: (venue: Venue) => FeeAssumption = getFeeAssumption,
+    private readonly bookResolver?: ComparisonBookResolver,
   ) {}
 
   async compare(asset: string, side: Side, amount: string): Promise<ComparisonResponse> {
@@ -55,6 +72,10 @@ export class ComparisonService {
           | 'priceIncrementRule'
           | 'quantityIncrementRule'
           | 'ruleMetadataVersion'
+          | 'transport'
+          | 'synchronization'
+          | 'connectionEpoch'
+          | 'liveRevision'
         > = {
           venue: adapter.venue,
           marketSegment: venueInstrument?.marketSegment ?? 'spot',
@@ -67,14 +88,37 @@ export class ComparisonService {
           priceIncrementRule,
           quantityIncrementRule,
           ruleMetadataVersion: metadataVersion,
+          transport: 'REST_SNAPSHOT',
         };
         try {
-          const book = validateBook(await adapter.getBook(asset));
+          const resolution = await this.bookResolver?.(adapter, asset);
+          if (resolution && !resolution.book) {
+            return {
+              ...base,
+              status: resolution.status ?? 'UNSYNCED',
+              statusReason: resolution.reason ?? 'Live book belum tersinkronisasi.',
+              healthReason: resolution.reason,
+              transport: resolution.transport,
+              synchronization: resolution.synchronization,
+              connectionEpoch: resolution.connectionEpoch,
+              liveRevision: resolution.liveRevision,
+            };
+          }
+          const book = validateBook(resolution?.book ?? (await adapter.getBook(asset)));
+          const provenance = resolution
+            ? {
+                transport: resolution.transport,
+                synchronization: resolution.synchronization,
+                connectionEpoch: resolution.connectionEpoch,
+                liveRevision: resolution.liveRevision,
+              }
+            : {};
           validateBookIncrements(book, priceIncrementRule, quantityIncrementRule);
           const ageMs = Math.max(0, Date.now() - Date.parse(book.receivedAt));
           if (!Number.isFinite(ageMs) || ageMs > this.staleAfterMs) {
             return {
               ...base,
+              ...provenance,
               status: 'STALE',
               statusReason: 'Snapshot melewati ambang kesegaran dan tidak ikut diranking.',
               receivedAt: book.receivedAt,
@@ -94,6 +138,7 @@ export class ComparisonService {
           if (decimal(executableBaseQuantity).eq(0)) {
             return {
               ...base,
+              ...provenance,
               status: 'BELOW_MINIMUM',
               statusReason: 'Ukuran menjadi nol setelah dibulatkan turun ke increment venue.',
               requestedQuoteBudget: side === 'buy' ? amount : undefined,
@@ -133,6 +178,7 @@ export class ComparisonService {
           if (belowMinimum) {
             return {
               ...base,
+              ...provenance,
               status: 'BELOW_MINIMUM',
               statusReason: 'Ukuran pasca-kuantisasi berada di bawah aturan minimum venue.',
               requestedQuoteBudget: side === 'buy' ? amount : undefined,
@@ -155,6 +201,7 @@ export class ComparisonService {
           const withFee = this.applyFee(walk.grossOutcome, side, base.fee);
           return {
             ...base,
+            ...provenance,
             status: sufficient ? 'ELIGIBLE' : 'INSUFFICIENT_DEPTH',
             statusReason: sufficient
               ? 'Snapshot sehat dan kedalaman terlihat mencukupi.'

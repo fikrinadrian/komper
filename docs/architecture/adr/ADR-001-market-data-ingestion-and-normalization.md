@@ -1,7 +1,7 @@
 # ADR-001: Use capability-based venue adapters with canonical, health-gated market events
 
-- Status: Proposed
-- Date: 2026-07-17
+- Status: Accepted
+- Date: 2026-07-18
 - Owners: CTO
 - Related PRD/architecture: [Market Lens PRD](../../product/market-lens-prd.md); [Komper Market Lens architecture](../market-lens-architecture.md)
 
@@ -95,6 +95,19 @@ WebSocket is preferred for continuous updates; REST is used for discovery, initi
 
 CCXT may be used later as an adapter implementation detail or comparison oracle if tests establish adequate field and behavior coverage. It is not the canonical domain contract or sole correctness boundary.
 
+### Accepted WebSocket amendment (2026-07-18)
+
+The first live release is public spot order books only. The capability assignments are binding:
+
+- Indodax is a Centrifugo-compatible, server-side **full-snapshot** feed with server epoch/offset tracking and same-epoch contiguous offset recovery. Failed or unproven recovery invalidates state and falls back to a clean subscription, fresh snapshot, and REST correlation.
+- Reku is a server-side Phoenix Channels **full-snapshot** feed. Each `order:{coinId}` message replaces atomically; reconnect invalidates; no sequence/source time is invented; REST verifies periodically.
+- Tokocrypto type 1 uses the documented REST `lastUpdateId` plus exact `U/u` sequence algorithm and gap-triggered bootstrap. Start at the normal depth cadence; `@100ms` needs later load evidence.
+- Tokocrypto type 3 remains **REST polling only** until an independently observed and replay-tested WebSocket contract is approved. Type-1 semantics cannot be reused.
+
+Canonical state is a process-local, single-writer `LiveBookStore` of immutable full records carrying local revision, connection epoch, transport, provenance, synchronization, and health. It is non-durable and starts empty after restart. Only synchronized/live records can rank. This constrains the first deployment to one ingestion owner.
+
+The BFF delivers complete comparison replacements with same-origin **SSE**. Coalescing occurs only after canonical books are built. Reconnect recomputes current state; event IDs do not promise durable replay. Existing REST comparison remains bootstrap/rollback. Browsers never connect to exchanges.
+
 ## Consequences
 
 Positive consequences:
@@ -114,6 +127,9 @@ Negative consequences and follow-up work:
 - Each adapter needs explicit fixtures for whether Reku, Indodax, and Tokocrypto metadata fields represent literal steps or decimal-place counts; unverified mappings reduce temporary product coverage.
 - Historical event volume and retention cost must be measured before long-term storage is enabled.
 - Private portfolio and execution adapters require a separate trust boundary and future ADR; they cannot be added to public workers merely because the capability registry can describe them.
+- Process-local live state prevents horizontal ingestion replicas until ownership and state distribution are designed.
+- Type 3 has explicit lower-cadence `REST_POLL` behavior rather than false WebSocket parity.
+- SSE cannot replay intermediate states durably; complete replacement on reconnect makes that acceptable for this read-only product.
 
 Operationally, dashboards and alerts must be labeled by venue and segment. On-call runbooks must distinguish transport connection, schema validity, book synchronization, and product eligibility.
 
@@ -129,6 +145,12 @@ Operationally, dashboards and alerts must be labeled by venue and segment. On-ca
 Feature flags exist at venue, market segment, capability, and instrument level. Rollback disables the failing producer and invalidates its current books. Canonical consumers continue serving remaining eligible venues. A canonical schema rollback requires stopping incompatible producers first and retaining a reader for the previous version until stored events age out or are migrated.
 
 ## Validation
+
+- Indodax: handshake/subscription/ping, full replacement, server epoch/offset, contiguous recovery, failure invalidation, and REST-correlated clean recovery.
+- Reku: Phoenix join/error/heartbeat, full replacement, coin identity, reconnect invalidation, no fabricated source time, and REST mismatch quarantine.
+- Tokocrypto: deterministic type-1 `lastUpdateId`/`U/u` bootstrap and fault replay; configuration rejects any type-3 WebSocket registration.
+- Live store: one writer, atomic revisions, old-epoch rejection, health eligibility, shutdown, and empty restart.
+- Browser: SSE initial/update/reconnect/backpressure/accessibility behavior and no exchange URL/token exposure.
 
 - Contract tests cover documented and observed response variants for all three venues.
 - Canonical identity tests prove that symbol casing, separators, aliases, quote assets, and Tokocrypto segment types cannot collide.
