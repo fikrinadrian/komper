@@ -15,7 +15,7 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['Pixel 5'] } },
   ],
   webServer: {
-    command: 'cross-env MARKET_DATA_MODE=fixture PORT=3000 npm start',
+    command: 'cross-env MARKET_DATA_MODE=fixture PORT=3000 pnpm start',
     url: 'http://127.0.0.1:3000/api/health',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

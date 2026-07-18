@@ -2,18 +2,19 @@
   "name": "komper-market-lens",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n bff,web -c cyan,magenta \"tsx watch src/server/index.ts\" \"vite\"",
+    "dev": "concurrently -k -n bff,web -c cyan,magenta \"tsx watch --env-file-if-exists=.env src/server/index.ts\" \"vite\"",
     "build": "vite build && tsup src/server/index.ts --format esm --out-dir dist/server --clean --sourcemap",
-    "start": "node dist/server/index.js",
+    "start": "node --env-file-if-exists=.env dist/server/index.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pretest:e2e": "npm run build",
+    "pretest:e2e": "pnpm run build",
     "test:e2e": "playwright test"
   },
   "dependencies": {

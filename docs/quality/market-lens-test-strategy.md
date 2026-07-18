@@ -127,12 +127,12 @@ Fixture mode is the deterministic release oracle. It contains no user data, cred
 
 | Gate | Command/evidence | Required threshold |
 | --- | --- | --- |
-| Formatting | `npm run format:check` | Zero unformatted files |
-| Types | `npm run typecheck` | Zero errors |
-| Lint | `npm run lint` | Zero errors/warnings |
-| Unit/integration | `npm test` | All deterministic tests pass |
-| Build | `npm run build` | Production client and server build |
-| Browser | `npm run test:e2e` | All applicable projects pass; skips explained |
+| Formatting | `pnpm run format:check` | Zero unformatted files |
+| Types | `pnpm run typecheck` | Zero errors |
+| Lint | `pnpm run lint` | Zero errors/warnings |
+| Unit/integration | `pnpm test` | All deterministic tests pass |
+| Build | `pnpm run build` | Production client and server build |
+| Browser | `pnpm run test:e2e` | All applicable projects pass; skips explained |
 | Public contract | Low-rate live catalog plus one buy/sell BTC comparison | Schemas accepted or venue safely quarantined; not an uptime gate |
 | Correctness | All AC-02–AC-11 financial/health regression tests | 100% pass; no P0/P1 defects |
 | Legal | Venue rights evidence and explicit product/legal decision | Required for public monetization |
