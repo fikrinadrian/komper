@@ -10,21 +10,9 @@ const VENUE_LABEL: Record<Venue, string> = {
 };
 
 const VENUE_COLOR: Record<Venue, string> = {
-  INDODAX: '#ff6b54',
-  REKU: '#29c3a2',
-  TOKOCRYPTO: '#6275d7',
-};
-
-const VENUE_DASH = {
-  INDODAX: 'Solid',
-  REKU: 'ShortDash',
-  TOKOCRYPTO: 'Dot',
-} as const;
-
-const VENUE_LINE_LABEL: Record<Venue, string> = {
-  INDODAX: 'garis solid',
-  REKU: 'garis putus-putus',
-  TOKOCRYPTO: 'garis titik-titik',
+  INDODAX: '#38bdf8',
+  REKU: '#8b5cf6',
+  TOKOCRYPTO: '#22c55e',
 };
 
 export function HighchartsPriceChart({
@@ -107,7 +95,7 @@ export function HighchartsPriceChart({
         id: item.venue,
         name: VENUE_LABEL[item.venue],
         color: VENUE_COLOR[item.venue],
-        dashStyle: VENUE_DASH[item.venue],
+        dashStyle: 'Solid' as const,
         data: item.points.map(([timestamp, close]) => {
           const candle = candles.get(timestamp);
           if (close === null || !candle) return [timestamp, null];
@@ -123,7 +111,7 @@ export function HighchartsPriceChart({
         }),
         showInLegend: true,
         accessibility: {
-          description: `${VENUE_LABEL[item.venue]}, ${VENUE_LINE_LABEL[item.venue]}, harga OHLC dalam rupiah.`,
+          description: `${VENUE_LABEL[item.venue]}, garis solid, harga OHLC dalam rupiah.`,
         },
       };
     }),
