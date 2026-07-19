@@ -1,26 +1,47 @@
 import Decimal from 'decimal.js';
-import type { MarketCandle, MarketDetailVenue, Venue } from '@shared/contracts.js';
+import type {
+  MarketCandle,
+  MarketCandleInterval,
+  MarketChartVenue,
+  Venue,
+} from '@shared/contracts.js';
 
-export type ChartPoint = { bucket: number; value: number; candle: MarketCandle };
-export type ChartSeries = {
-  venue: Venue;
-  points: ChartPoint[];
-  segments: ChartPoint[][];
+const VENUES: Venue[] = ['INDODAX', 'REKU', 'TOKOCRYPTO'];
+
+const INTERVAL_MS: Record<MarketCandleInterval, number> = {
+  '1h': 3_600_000,
+  '4h': 14_400_000,
+  '1d': 86_400_000,
+  '1w': 604_800_000,
 };
 
-function candleMap(candles: MarketCandle[]): Map<number, MarketCandle> {
+export type AbsoluteChartPoint = [timestamp: number, close: number | null];
+export type AbsoluteChartSeries = {
+  venue: Venue;
+  status: MarketChartVenue['status'];
+  reason?: string;
+  candles: MarketCandle[];
+  points: AbsoluteChartPoint[];
+};
+
+export type AbsoluteChartModel = {
+  series: AbsoluteChartSeries[];
+  timestamps: number[];
+  maxOverlappingVenues: number;
+};
+
+function validCandles(candles: MarketCandle[]): Map<number, MarketCandle> {
   const result = new Map<number, MarketCandle>();
   for (const candle of candles) {
-    const time = Date.parse(candle.openedAt);
+    const timestamp = Date.parse(candle.openedAt);
     try {
       const open = new Decimal(candle.open);
       const high = new Decimal(candle.high);
       const low = new Decimal(candle.low);
       const close = new Decimal(candle.close);
       if (
-        !Number.isFinite(time) ||
-        time % 3_600_000 !== 0 ||
-        result.has(time) ||
+        !Number.isFinite(timestamp) ||
+        result.has(timestamp) ||
         !open.isPositive() ||
         !high.isPositive() ||
         !low.isPositive() ||
@@ -30,49 +51,71 @@ function candleMap(candles: MarketCandle[]): Map<number, MarketCandle> {
         high.lessThan(open) ||
         high.lessThan(close)
       ) {
-        return new Map();
+        continue;
       }
-      result.set(time, candle);
+      result.set(timestamp, candle);
     } catch {
-      return new Map();
+      continue;
     }
   }
   return result;
 }
 
-export function buildChartSeries(venues: MarketDetailVenue[]): {
-  series: ChartSeries[];
-  baseline?: number;
-} {
-  const available = venues
-    .filter((venue) => venue.status === 'AVAILABLE' && venue.candles?.length)
-    .map((venue) => ({ venue: venue.venue, candles: candleMap(venue.candles ?? []) }))
-    .filter((venue) => venue.candles.size > 0);
-  if (available.length < 2) return { series: [] };
-
-  const commonBuckets = [...available[0].candles.keys()].filter((bucket) =>
-    available.every((venue) => venue.candles.has(bucket)),
+export function buildAbsoluteChartSeries(
+  venues: MarketChartVenue[],
+  interval: MarketCandleInterval,
+): AbsoluteChartModel {
+  const intervalMs = INTERVAL_MS[interval];
+  const sourceByVenue = new Map(venues.map((venue) => [venue.venue, venue]));
+  const candleMaps = new Map(
+    VENUES.map((venue) => [venue, validCandles(sourceByVenue.get(venue)?.candles ?? [])]),
   );
-  const baseline = commonBuckets.sort((a, b) => a - b)[0];
-  if (baseline === undefined) return { series: [] };
+  const observed = [...new Set([...candleMaps.values()].flatMap((map) => [...map.keys()]))].sort(
+    (left, right) => left - right,
+  );
 
-  const series = available.map((item) => {
-    const baselineClose = item.candles.get(baseline)!.close;
-    const points = [...item.candles.entries()]
-      .filter(([bucket]) => bucket >= baseline)
-      .sort(([left], [right]) => left - right)
-      .map(([bucket, candle]) => ({
-        bucket,
-        candle,
-        value: new Decimal(candle.close).div(baselineClose).minus(1).mul(100).toNumber(),
-      }));
-    const segments: ChartPoint[][] = [];
-    for (const point of points) {
-      const current = segments.at(-1);
-      if (!current || point.bucket - current.at(-1)!.bucket !== 3_600_000) segments.push([point]);
-      else current.push(point);
-    }
-    return { venue: item.venue, points, segments };
+  if (observed.length === 0) {
+    return {
+      timestamps: [],
+      maxOverlappingVenues: 0,
+      series: VENUES.map((venue) => ({
+        venue,
+        status: sourceByVenue.get(venue)?.status ?? 'UNAVAILABLE',
+        reason: sourceByVenue.get(venue)?.reason,
+        candles: [],
+        points: [],
+      })),
+    };
+  }
+
+  const timestamps: number[] = [];
+  for (let timestamp = observed[0]; timestamp <= observed.at(-1)!; timestamp += intervalMs) {
+    timestamps.push(timestamp);
+  }
+
+  const series = VENUES.map((venue) => {
+    const source = sourceByVenue.get(venue);
+    const candles = candleMaps.get(venue)!;
+    return {
+      venue,
+      status: source?.status ?? 'UNAVAILABLE',
+      reason: source?.reason,
+      candles: [...candles.values()].sort(
+        (left, right) => Date.parse(left.openedAt) - Date.parse(right.openedAt),
+      ),
+      points: timestamps.map((timestamp): AbsoluteChartPoint => [
+        timestamp,
+        candles.has(timestamp) ? new Decimal(candles.get(timestamp)!.close).toNumber() : null,
+      ]),
+    };
   });
-  return { series, baseline };
+  return {
+    timestamps,
+    series,
+    maxOverlappingVenues: Math.max(
+      ...timestamps.map((_, index) =>
+        series.reduce((count, item) => count + (item.points[index]?.[1] === null ? 0 : 1), 0),
+      ),
+    ),
+  };
 }

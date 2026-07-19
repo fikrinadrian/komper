@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { validateBook } from '@server/domain/orderbook.js';
-import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type {
+  CanonicalBook,
+  MarketCandleRequest,
+  VenueAdapter,
+  VenueInstrument,
+} from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
 import { decimalPlacesRule } from '@server/domain/increments.js';
 import { fetchPublicJson, nowIso } from './http.js';
@@ -150,7 +155,11 @@ export class RekuAdapter implements VenueAdapter {
     return undefined;
   }
 
-  async getCandles(asset: string, signal?: AbortSignal): Promise<MarketCandle[]> {
+  async getCandles(
+    asset: string,
+    request?: MarketCandleRequest,
+    signal?: AbortSignal,
+  ): Promise<MarketCandle[]> {
     let id = this.idByAsset.get(asset.toUpperCase());
     if (!id) {
       await this.listTickers(signal);
@@ -159,11 +168,13 @@ export class RekuAdapter implements VenueAdapter {
     if (!id) throw new Error('reku_instrument_id_missing');
     const url = new URL('https://api.reku.id/v2/chart');
     url.searchParams.set('id', id);
-    url.searchParams.set('f', '60');
+    const intervalMs = request?.intervalMs ?? 3_600_000;
+    const limit = request?.limit ?? 24;
+    url.searchParams.set('f', String(intervalMs / 60_000));
     const raw = candlesSchema.parse(await fetchPublicJson(url, HOSTS, signal));
-    return raw.slice(-24).map(([time, open, close, low, high, baseVolume, quoteVolume]) => ({
+    return raw.slice(-limit).map(([time, open, close, low, high, baseVolume, quoteVolume]) => ({
       openedAt: rekuTime(time),
-      closedAt: new Date(Date.parse(rekuTime(time)) + 3_599_999).toISOString(),
+      closedAt: new Date(Date.parse(rekuTime(time)) + intervalMs - 1).toISOString(),
       open,
       high,
       low,

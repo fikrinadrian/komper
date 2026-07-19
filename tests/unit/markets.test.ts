@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MarketsService } from '@server/services/markets-service.js';
+import { marketCandleRequest, MarketsService } from '@server/services/markets-service.js';
 import { CatalogService } from '@server/services/catalog-service.js';
-import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type {
+  CanonicalBook,
+  MarketCandleRequest,
+  VenueAdapter,
+  VenueInstrument,
+} from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, Venue } from '@shared/contracts.js';
 import { stepRule } from '@server/domain/increments.js';
 
@@ -55,10 +60,13 @@ class MarketsAdapter implements VenueAdapter {
     return undefined;
   }
 
-  async getCandles(): Promise<MarketCandle[]> {
+  async getCandles(_asset: string, request?: MarketCandleRequest): Promise<MarketCandle[]> {
+    const openedAt = request?.fromMs ?? Date.parse('2026-07-17T23:00:00.000Z');
+    const intervalMs = request?.intervalMs ?? 3_600_000;
     return [
       {
-        openedAt: '2026-07-18T00:00:00.000Z',
+        openedAt: new Date(openedAt).toISOString(),
+        closedAt: new Date(openedAt + intervalMs - 1).toISOString(),
         open: '100',
         high: '101',
         low: '99',
@@ -115,5 +123,30 @@ describe('Markets union and partial venue coverage', () => {
     );
     const response = await boundaryMarkets.getOverview();
     expect(response.rows.find((row) => row.asset === 'BTC')?.venues[0].status).toBe(status);
+  });
+
+  it.each([
+    ['1d', '1h', 24],
+    ['1w', '4h', 42],
+    ['1y', '1d', 365],
+    ['all', '1w', 1000],
+  ] as const)('maps %s to a bounded %s candle request', (period, interval, limit) => {
+    const request = marketCandleRequest(period, Date.parse('2026-07-18T00:00:00.000Z'));
+    expect(request).toMatchObject({ period, interval, limit });
+    expect(request.fromMs).toBeLessThan(request.toMs);
+  });
+
+  it('keeps partial chart coverage explicit for one-venue markets', async () => {
+    const response = await markets.getChart('SOL', '1d');
+    expect(response).toMatchObject({ period: '1d', interval: '1h' });
+    expect(response.venues).toEqual([
+      expect.objectContaining({
+        venue: 'INDODAX',
+        status: 'AVAILABLE',
+        reason: 'Riwayat parsial: 1 dari 24 bucket.',
+      }),
+      expect.objectContaining({ venue: 'REKU', status: 'UNSUPPORTED', candles: [] }),
+      expect.objectContaining({ venue: 'TOKOCRYPTO', status: 'UNSUPPORTED', candles: [] }),
+    ]);
   });
 });

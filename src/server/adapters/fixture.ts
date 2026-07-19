@@ -1,5 +1,10 @@
 import Decimal from 'decimal.js';
-import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type {
+  CanonicalBook,
+  MarketCandleRequest,
+  VenueAdapter,
+  VenueInstrument,
+} from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, MarketTrade, Venue } from '@shared/contracts.js';
 import { stepRule } from '@server/domain/increments.js';
 
@@ -129,20 +134,27 @@ export class FixtureAdapter implements VenueAdapter {
     }));
   }
 
-  async getCandles(asset: string): Promise<MarketCandle[]> {
+  async getCandles(asset: string, request?: MarketCandleRequest): Promise<MarketCandle[]> {
     const reference = new Decimal(BASE_PRICES[asset] ?? '10000').mul(VENUE_FACTOR[this.venue]);
     const venueOffset = this.venue === 'INDODAX' ? 0 : this.venue === 'REKU' ? 1 : 2;
-    const latestClosedHour = Math.floor(Date.now() / 3_600_000) * 3_600_000 - 3_600_000;
-    return Array.from({ length: 24 }, (_, index) => {
-      const openedAt = latestClosedHour - (23 - index) * 3_600_000;
-      const movement = new Decimal(index - 12)
-        .mul('0.0007')
+    const intervalMs = request?.intervalMs ?? 3_600_000;
+    const limit = request?.limit ?? 24;
+    const mondayAnchorMs = 4 * 86_400_000;
+    const currentBucket =
+      request?.interval === '1w'
+        ? Math.floor((Date.now() - mondayAnchorMs) / intervalMs) * intervalMs + mondayAnchorMs
+        : Math.floor(Date.now() / intervalMs) * intervalMs;
+    const latestClosedBucket = currentBucket - intervalMs;
+    return Array.from({ length: limit }, (_, index) => {
+      const openedAt = latestClosedBucket - (limit - 1 - index) * intervalMs;
+      const movement = new Decimal(index - Math.floor(limit / 2))
+        .mul(new Decimal('0.0168').div(Math.max(limit, 1)))
         .plus(new Decimal(((index + venueOffset) % 5) - 2).mul('0.0012'));
       const open = reference.mul(new Decimal(1).plus(movement));
       const close = open.mul(new Decimal(1).plus(new Decimal((index % 3) - 1).mul('0.0008')));
       return {
         openedAt: new Date(openedAt).toISOString(),
-        closedAt: new Date(openedAt + 3_599_999).toISOString(),
+        closedAt: new Date(openedAt + intervalMs - 1).toISOString(),
         open: open.toFixed(2),
         high: Decimal.max(open, close).mul('1.0015').toFixed(2),
         low: Decimal.min(open, close).mul('0.9985').toFixed(2),

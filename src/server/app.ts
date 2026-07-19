@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ZodError, z } from 'zod';
-import { comparisonRequestSchema } from '@shared/contracts.js';
+import { comparisonRequestSchema, marketChartPeriodSchema } from '@shared/contracts.js';
 import { createServices } from './services/market-data.js';
 import { serveComparisonSse } from './live/sse.js';
 
@@ -85,6 +85,18 @@ export function createApp(services: Services = createServices('live')) {
     try {
       const result = await services.markets.getOverview();
       response.setHeader('Cache-Control', 'private, max-age=15');
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/markets/:pair/candles', async (request, response, next) => {
+    try {
+      const pair = marketPairSchema.parse(request.params.pair);
+      const period = marketChartPeriodSchema.parse(request.query.period ?? '1d');
+      const result = await services.markets.getChart(pair.slice(0, -4), period);
+      response.setHeader('Cache-Control', 'private, max-age=60');
       response.json(result);
     } catch (error) {
       next(error);

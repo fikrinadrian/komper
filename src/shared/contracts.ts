@@ -198,6 +198,10 @@ export type MarketCandle = {
   tradeCount?: number;
 };
 
+export const marketChartPeriodSchema = z.enum(['1d', '1w', '1y', 'all']);
+export type MarketChartPeriod = z.infer<typeof marketChartPeriodSchema>;
+export type MarketCandleInterval = '1h' | '4h' | '1d' | '1w';
+
 export type MarketOrderBook = {
   bids: Array<{ price: string; quantity: string }>;
   asks: Array<{ price: string; quantity: string }>;
@@ -233,6 +237,33 @@ export type MarketDetailResponse = {
   interval: '1h';
   generatedAt: string;
   venues: MarketDetailVenue[];
+  disclosure: string;
+};
+
+export type MarketChartVenue = {
+  venue: Venue;
+  marketSegment: string;
+  venueSymbol: string;
+  status: MarketDataStatus;
+  reason?: string;
+  expectedBuckets?: number;
+  coverageStartAt?: string;
+  coverageEndAt?: string;
+  candles: MarketCandle[];
+};
+
+export type MarketChartResponse = {
+  schemaVersion: '1';
+  pair: string;
+  asset: string;
+  quote: 'IDR';
+  period: MarketChartPeriod;
+  interval: MarketCandleInterval;
+  requestedFromAt: string;
+  requestedToAt: string;
+  maxBucketsPerVenue: number;
+  generatedAt: string;
+  venues: MarketChartVenue[];
   disclosure: string;
 };
 

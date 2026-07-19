@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { validateMarketCandles } from '@server/domain/market-history.js';
+import {
+  MARKET_DAY_MS,
+  MARKET_WEEK_MS,
+  validateMarketCandles,
+} from '@server/domain/market-history.js';
 import type { MarketCandle } from '@shared/contracts.js';
 
 function valid(overrides: Partial<MarketCandle> = {}): MarketCandle {
@@ -37,5 +41,25 @@ describe('market candle validation', () => {
 
   it('turns conflicting duplicate buckets into an explicit gap', () => {
     expect(validateMarketCandles([valid(), valid({ close: '104' })], afterClose)).toEqual([]);
+  });
+
+  it('accepts daily and Monday-aligned weekly closed buckets', () => {
+    const daily = valid({
+      openedAt: '2026-07-17T00:00:00.000Z',
+      closedAt: '2026-07-17T23:59:59.999Z',
+    });
+    const weekly = valid({
+      openedAt: '2026-07-06T00:00:00.000Z',
+      closedAt: '2026-07-12T23:59:59.999Z',
+    });
+    expect(validateMarketCandles([daily], afterClose, MARKET_DAY_MS)).toHaveLength(1);
+    expect(validateMarketCandles([weekly], afterClose, MARKET_WEEK_MS)).toHaveLength(1);
+    expect(
+      validateMarketCandles(
+        [weekly, { ...weekly, openedAt: '2026-07-07T00:00:00.000Z' }],
+        afterClose,
+        MARKET_WEEK_MS,
+      ),
+    ).toHaveLength(1);
   });
 });

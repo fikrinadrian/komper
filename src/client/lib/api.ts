@@ -2,6 +2,8 @@ import type {
   ApiError,
   CatalogResponse,
   ComparisonResponse,
+  MarketChartPeriod,
+  MarketChartResponse,
   MarketDetailResponse,
   MarketsResponse,
   Side,
@@ -88,6 +90,20 @@ export async function getMarketDetail(pair: string): Promise<MarketDetailRespons
   return readJson<MarketDetailResponse>(
     await fetch(`/api/markets/${encodeURIComponent(pair)}`, {
       headers: { accept: 'application/json' },
+    }),
+  );
+}
+
+export async function getMarketChart(
+  pair: string,
+  period: MarketChartPeriod,
+  signal?: AbortSignal,
+): Promise<MarketChartResponse> {
+  const params = new URLSearchParams({ period });
+  return readJson<MarketChartResponse>(
+    await fetch(`/api/markets/${encodeURIComponent(pair)}/candles?${params}`, {
+      headers: { accept: 'application/json' },
+      signal,
     }),
   );
 }

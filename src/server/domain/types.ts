@@ -1,6 +1,8 @@
 import type {
   IncrementRule,
   MarketCandle,
+  MarketCandleInterval,
+  MarketChartPeriod,
   MarketTicker,
   MarketTrade,
   Venue,
@@ -39,11 +41,24 @@ export type VenueInstrument = {
   metadataVersion: string;
 };
 
+export type MarketCandleRequest = {
+  period: MarketChartPeriod;
+  interval: MarketCandleInterval;
+  intervalMs: number;
+  limit: number;
+  fromMs: number;
+  toMs: number;
+};
+
 export interface VenueAdapter {
   readonly venue: Venue;
   discover(signal?: AbortSignal): Promise<VenueInstrument[]>;
   getBook(asset: string, signal?: AbortSignal): Promise<CanonicalBook>;
   listTickers?(signal?: AbortSignal): Promise<MarketTicker[]>;
   getTrades?(asset: string, signal?: AbortSignal): Promise<MarketTrade[] | undefined>;
-  getCandles?(asset: string, signal?: AbortSignal): Promise<MarketCandle[]>;
+  getCandles?(
+    asset: string,
+    request?: MarketCandleRequest,
+    signal?: AbortSignal,
+  ): Promise<MarketCandle[]>;
 }

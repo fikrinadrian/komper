@@ -19,18 +19,39 @@ test('finds a pair, compares venue prices, and opens the canonical detail route'
   await expect(page.getByRole('heading', { name: 'BTC/IDR', level: 1 })).toBeVisible();
   await expect(page.getByRole('table', { name: /pricing dan ticker/ })).toBeVisible();
   await expect(
-    page.getByRole('img', { name: /Perbandingan perubahan harga close per exchange/ }),
+    page.getByRole('region', {
+      name: 'Perbandingan harga close BTC/IDR per exchange. Highcharts interactive chart.',
+    }),
   ).toBeVisible();
-  await expect(page.getByText(/Baseline 0%:/)).toBeVisible();
-  const indodaxSeries = page.getByRole('button', { name: /Indodax/ });
-  await indodaxSeries.click();
-  await expect(page.getByRole('button', { name: /Indodax disembunyikan/ })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
+  await expect(page.getByRole('button', { name: '1D' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText(/Timeframe 1D · interval candle 1h/)).toBeVisible();
+  for (const timeframe of [
+    { button: '1W', period: '1w', interval: '4h' },
+    { button: '1Y', period: '1y', interval: '1d' },
+    { button: 'All', period: 'all', interval: '1w' },
+  ]) {
+    const response = page.waitForResponse(
+      (candidate) =>
+        candidate.url().includes(`/api/markets/btc-idr/candles?period=${timeframe.period}`) &&
+        candidate.ok(),
+    );
+    await page.getByRole('button', { name: timeframe.button, exact: true }).click();
+    await response;
+    await expect(page.getByRole('button', { name: timeframe.button, exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(
+      page.getByText(
+        new RegExp(
+          `Timeframe ${timeframe.period.toUpperCase()} · interval candle ${timeframe.interval}`,
+        ),
+      ),
+    ).toBeVisible();
+  }
   await page.getByText('Data grafik aksesibel').click();
   await expect(
-    page.getByRole('table', { name: /OHLC dan perubahan setiap exchange/ }),
+    page.getByRole('table', { name: /Harga OHLC Indodax, Reku, dan Tokocrypto/ }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Order book per exchange' })).toBeVisible();
   await expect(
@@ -59,6 +80,30 @@ test('canonicalizes uppercase pair paths and rejects malformed market routes wit
   await page.goto('/markets/nope-idr');
   await expect(page.getByRole('heading', { name: 'NOPE/IDR belum tersedia' })).toBeVisible();
   expect(unsupportedDetailRequested).toBe(false);
+});
+
+test('keeps the last successful chart when a new timeframe fails', async ({ page }) => {
+  await page.route('**/api/markets/btc-idr/candles?period=1y', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'SERVICE_UNAVAILABLE', message: 'Riwayat 1Y sedang tidak tersedia.' },
+      }),
+    });
+  });
+  await page.goto('/markets/btc-idr');
+  await expect(page.getByText(/Timeframe 1D · interval candle 1h/)).toBeVisible();
+
+  await page.getByRole('button', { name: '1Y', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'Data market gagal dimuat' })).toBeVisible();
+  await expect(page.getByText(/Grafik 1D terakhir tetap ditampilkan/)).toBeVisible();
+  await expect(page.getByText(/Timeframe 1D · interval candle 1h/)).toBeVisible();
+  await expect(page.getByRole('button', { name: '1Y', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('retries a partial aggregate snapshot without hiding healthy pricing', async ({ page }) => {

@@ -1,10 +1,16 @@
-import { useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Decimal from 'decimal.js';
-import type { MarketDetailVenue, MarketOverviewVenue, Venue } from '@shared/contracts.js';
-import { getMarketDetail, getMarkets } from '@client/lib/api.js';
+import type {
+  MarketChartPeriod,
+  MarketChartResponse,
+  MarketDetailVenue,
+  MarketOverviewVenue,
+  Venue,
+} from '@shared/contracts.js';
+import { getMarketChart, getMarketDetail, getMarkets } from '@client/lib/api.js';
 import { formatAsset, formatIdr, formatTime } from '@client/lib/format.js';
-import { buildChartSeries } from '@client/lib/market-chart.js';
+import { buildAbsoluteChartSeries } from '@client/lib/market-chart.js';
 import { Logo } from '@client/components/Logo.js';
 
 const VENUES: Venue[] = ['INDODAX', 'REKU', 'TOKOCRYPTO'];
@@ -13,11 +19,11 @@ const VENUE_LABEL: Record<Venue, string> = {
   REKU: 'Reku',
   TOKOCRYPTO: 'Tokocrypto',
 };
-const VENUE_COLOR: Record<Venue, string> = {
-  INDODAX: '#ff6b54',
-  REKU: '#29c3a2',
-  TOKOCRYPTO: '#6275d7',
-};
+const HighchartsPriceChart = lazy(() =>
+  import('@client/components/HighchartsPriceChart.js').then((module) => ({
+    default: module.HighchartsPriceChart,
+  })),
+);
 
 function formatPercent(value?: string): string {
   if (value === undefined) return '—';
@@ -325,221 +331,203 @@ export function MarketsPage() {
   );
 }
 
-function MovementChart({ venues }: { venues: MarketDetailVenue[] }) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const [hiddenVenues, setHiddenVenues] = useState<Venue[]>([]);
-  const { series, baseline } = buildChartSeries(venues);
-  if (series.length === 0 || baseline === undefined) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
-        Diperlukan setidaknya dua exchange dengan bucket 1 jam yang sama. Grafik tidak dibentuk agar
-        data tunggal atau waktu yang berbeda tidak terkesan sebanding.
-      </div>
-    );
-  }
+const CHART_PERIODS: Array<{ value: MarketChartPeriod; label: string }> = [
+  { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' },
+  { value: '1y', label: '1Y' },
+  { value: 'all', label: 'All' },
+];
 
-  const width = 900;
-  const height = 360;
-  const left = 62;
-  const right = 20;
-  const top = 20;
-  const bottom = 48;
-  const visibleSeries = series.filter((item) => !hiddenVenues.includes(item.venue));
-  const all = visibleSeries.flatMap((item) => item.points);
-  const sharedBuckets = [
-    ...new Set(series.flatMap((item) => item.points.map((point) => point.bucket))),
-  ].sort((leftBucket, rightBucket) => leftBucket - rightBucket);
-  const minTime = Math.min(...all.map((point) => point.bucket));
-  const maxTime = Math.max(...all.map((point) => point.bucket));
-  const rawMin = Math.min(0, ...all.map((point) => point.value));
-  const rawMax = Math.max(0, ...all.map((point) => point.value));
-  const padding = Math.max((rawMax - rawMin) * 0.1, 0.5);
-  const minValue = rawMin - padding;
-  const maxValue = rawMax + padding;
-  const x = (time: number) =>
-    left + ((time - minTime) / Math.max(maxTime - minTime, 1)) * (width - left - right);
-  const y = (value: number) =>
-    top + ((maxValue - value) / Math.max(maxValue - minValue, 1)) * (height - top - bottom);
-  const yTicks = Array.from(
-    { length: 5 },
-    (_, index) => minValue + ((maxValue - minValue) * index) / 4,
+function MovementChart({ pair }: { pair: string }) {
+  const [period, setPeriod] = useState<MarketChartPeriod>('1d');
+  const [lastSuccessfulData, setLastSuccessfulData] = useState<MarketChartResponse>();
+  const chart = useQuery({
+    queryKey: ['market-chart', pair, period],
+    queryFn: ({ signal }) => getMarketChart(pair, period, signal),
+    staleTime: 60_000,
+    placeholderData: (previousData) =>
+      previousData && previousData.pair.toLowerCase() === pair ? previousData : undefined,
+  });
+  useEffect(() => {
+    if (chart.data && !chart.isPlaceholderData && !chart.isError) {
+      setLastSuccessfulData(chart.data);
+    }
+  }, [chart.data, chart.isError, chart.isPlaceholderData]);
+  const retainedData =
+    lastSuccessfulData?.pair.toLowerCase() === pair ? lastSuccessfulData : undefined;
+  const displayedData = chart.data ?? retainedData;
+  const model = displayedData
+    ? buildAbsoluteChartSeries(displayedData.venues, displayedData.interval)
+    : undefined;
+  const hasData = model?.series.some((item) => item.candles.length > 0) ?? false;
+  const comparisonEligible = (model?.maxOverlappingVenues ?? 0) >= 2;
+  const unavailable = model?.series.filter(
+    (item) => item.status !== 'AVAILABLE' || item.candles.length === 0 || Boolean(item.reason),
   );
-  const xTicks = Array.from(
-    { length: 4 },
-    (_, index) => minTime + ((maxTime - minTime) * index) / 3,
-  );
-
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold">
-        {series.map((item) => {
-          const visible = !hiddenVenues.includes(item.venue);
-          return (
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div
+          className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1"
+          role="group"
+          aria-label="Timeframe grafik"
+        >
+          {CHART_PERIODS.map((item) => (
             <button
+              key={item.value}
               type="button"
-              key={item.venue}
-              aria-pressed={visible}
-              onClick={() => {
-                if (visible && visibleSeries.length === 1) return;
-                setHiddenVenues((current) =>
-                  current.includes(item.venue)
-                    ? current.filter((venue) => venue !== item.venue)
-                    : [...current, item.venue],
-                );
-              }}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25 ${
-                visible
-                  ? 'border-slate-300 bg-white text-ink'
-                  : 'border-slate-200 bg-slate-100 text-slate-500'
+              aria-pressed={period === item.value}
+              onClick={() => setPeriod(item.value)}
+              className={`rounded-lg px-4 py-2 text-xs font-extrabold transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25 ${
+                period === item.value
+                  ? 'bg-white text-ink shadow-sm'
+                  : 'text-slate-500 hover:text-ink'
               }`}
             >
-              <span
-                aria-hidden="true"
-                className="h-2.5 w-2.5 rounded-full border border-current"
-                style={{ backgroundColor: VENUE_COLOR[item.venue] }}
-              />
-              {VENUE_LABEL[item.venue]}
-              <span className="sr-only">{visible ? 'ditampilkan' : 'disembunyikan'}</span>
+              {item.label}
             </button>
-          );
-        })}
-      </div>
-      <div className="overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="min-w-[680px]"
-          role="img"
-          aria-labelledby={`${titleId} ${descriptionId}`}
-        >
-          <title id={titleId}>Perbandingan perubahan harga close per exchange</title>
-          <desc id={descriptionId}>
-            Harga close dinormalisasi ke nol persen pada bucket bersama pertama,
-            {formatDateTime(new Date(baseline).toISOString())} WIB. Garis terputus saat data satu
-            jam hilang.
-          </desc>
-          {yTicks.map((tick) => (
-            <g key={tick}>
-              <line
-                x1={left}
-                x2={width - right}
-                y1={y(tick)}
-                y2={y(tick)}
-                stroke={Math.abs(tick) < 0.001 ? '#94a3b8' : '#e2e8f0'}
-                strokeDasharray={Math.abs(tick) < 0.001 ? undefined : '4 5'}
-              />
-              <text x={left - 10} y={y(tick) + 4} textAnchor="end" fontSize="11" fill="#64748b">
-                {tick.toFixed(1)}%
-              </text>
-            </g>
           ))}
-          {xTicks.map((tick) => (
-            <text
-              key={tick}
-              x={x(tick)}
-              y={height - 17}
-              textAnchor={tick === minTime ? 'start' : tick === maxTime ? 'end' : 'middle'}
-              fontSize="11"
-              fill="#64748b"
-            >
-              {new Intl.DateTimeFormat('id-ID', {
-                timeZone: 'Asia/Jakarta',
-                day: '2-digit',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              }).format(new Date(tick))}
-            </text>
-          ))}
-          {visibleSeries.flatMap((item) =>
-            item.segments.map((segment, index) => (
-              <path
-                key={`${item.venue}-${index}`}
-                d={segment
-                  .map(
-                    (point, pointIndex) =>
-                      `${pointIndex === 0 ? 'M' : 'L'} ${x(point.bucket)} ${y(point.value)}`,
-                  )
-                  .join(' ')}
-                fill="none"
-                stroke={VENUE_COLOR[item.venue]}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-              />
-            )),
-          )}
-          {visibleSeries.flatMap((item) =>
-            item.points.length <= 48
-              ? item.points.map((point) => (
-                  <circle
-                    key={`${item.venue}-${point.bucket}`}
-                    cx={x(point.bucket)}
-                    cy={y(point.value)}
-                    r="3"
-                    fill={VENUE_COLOR[item.venue]}
-                  />
-                ))
-              : [],
-          )}
-        </svg>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-slate-500">
-        Baseline 0%: {formatDateTime(new Date(baseline).toISOString())} WIB. Setiap garis memakai
-        close exchange tersebut pada bucket yang sama; jeda data sengaja tidak disambungkan.
-      </p>
-      <details className="mt-4 rounded-xl border border-slate-200 px-4 py-3">
-        <summary className="cursor-pointer text-sm font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25">
-          Data grafik aksesibel
-        </summary>
-        <div className="mt-4 max-h-72 overflow-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
-            <caption className="sr-only">
-              OHLC dan perubahan setiap exchange pada timestamp yang sejajar
-            </caption>
-            <thead className="sticky top-0 bg-white text-slate-500">
-              <tr>
-                <th scope="col" className="py-2 pr-3">
-                  Waktu bersama
-                </th>
-                {series.map((item) => (
-                  <th scope="col" key={item.venue} className="px-2 py-2 text-right">
-                    {VENUE_LABEL[item.venue]} · O/H/L/C · %
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sharedBuckets.map((bucket) => (
-                <tr key={bucket} className="border-t border-slate-100">
-                  <th scope="row" className="py-2 pr-3 font-medium">
-                    {formatDateTime(new Date(bucket).toISOString())}
-                  </th>
-                  {series.map((item) => {
-                    const point = item.points.find((candidate) => candidate.bucket === bucket);
-                    return (
-                      <td key={item.venue} className="px-2 py-2 text-right tabular-nums">
-                        {point ? (
-                          <>
-                            {formatIdr(point.candle.open, true)} /{' '}
-                            {formatIdr(point.candle.high, true)} /{' '}
-                            {formatIdr(point.candle.low, true)} /{' '}
-                            {formatIdr(point.candle.close, true)} ·{' '}
-                            {formatPercent(String(point.value))}
-                          </>
-                        ) : (
-                          'Gap · tidak tersedia'
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </details>
+        {chart.isFetching && !chart.isPending && (
+          <span role="status" className="text-xs font-bold text-slate-500">
+            {chart.isPlaceholderData
+              ? `Memuat ${period.toUpperCase()} · grafik ${chart.data?.period.toUpperCase()} tetap ditampilkan…`
+              : `Memperbarui grafik ${period.toUpperCase()}…`}
+          </span>
+        )}
+      </div>
+
+      {chart.isPending && (
+        <LoadingPanel label={`Mengambil candle timeframe ${period.toUpperCase()}…`} />
+      )}
+      {chart.isError && (
+        <ErrorPanel message={chart.error.message} retry={() => void chart.refetch()} />
+      )}
+      {chart.isError && retainedData && (
+        <p role="status" className="mb-4 text-xs font-bold text-slate-600">
+          Grafik {retainedData.period.toUpperCase()} terakhir tetap ditampilkan saat{' '}
+          {period.toUpperCase()} dimuat ulang.
+        </p>
+      )}
+      {displayedData && unavailable && unavailable.length > 0 && (
+        <div
+          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950"
+          role="status"
+        >
+          <strong>Data grafik parsial.</strong>{' '}
+          {unavailable
+            .map((item) => `${VENUE_LABEL[item.venue]}: ${item.reason ?? 'candle tidak tersedia'}`)
+            .join(' · ')}
+        </div>
+      )}
+      {displayedData && !hasData && (
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
+          Candle untuk timeframe ini belum tersedia di ketiga exchange.
+        </div>
+      )}
+      {displayedData && model && hasData && (
+        <>
+          <p className="highcharts-description mb-3 text-xs leading-5 text-slate-600">
+            {comparisonEligible
+              ? `Line chart membandingkan harga close absolut ${displayedData.pair} pada waktu yang overlap.`
+              : `Line chart ini hanya menampilkan histori observasional ${displayedData.pair} karena belum ada dua exchange yang overlap pada timestamp yang sama.`}{' '}
+            Sumbu waktu menggunakan WIB. Titik kosong merupakan gap sumber dan tidak disambungkan.
+          </p>
+          <Suspense
+            fallback={
+              <div
+                role="status"
+                className="h-[410px] animate-pulse rounded-xl bg-slate-100 p-5 text-sm text-slate-500 motion-reduce:animate-none"
+              >
+                Menyiapkan visualisasi grafik…
+              </div>
+            }
+          >
+            <HighchartsPriceChart
+              pair={pair}
+              period={displayedData.period}
+              model={model}
+              comparisonEligible={comparisonEligible}
+            />
+          </Suspense>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Timeframe {displayedData.period.toUpperCase()} · interval candle{' '}
+            {displayedData.interval} · snapshot {formatDateTime(displayedData.generatedAt)} WIB.
+            Cakupan aktual {formatDateTime(new Date(model.timestamps[0]).toISOString())}–
+            {formatDateTime(new Date(model.timestamps.at(-1)!).toISOString())} WIB. Harga adalah
+            close tiap bucket OHLC, bukan kuotasi bid/ask yang dapat dieksekusi.
+          </p>
+          {displayedData.period === 'all' && (
+            <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+              <p className="font-extrabold text-ink">Cakupan histori All per exchange</p>
+              <ul className="mt-1 space-y-1">
+                {displayedData.venues.map((venue) => (
+                  <li key={venue.venue}>
+                    {VENUE_LABEL[venue.venue]}:{' '}
+                    {venue.coverageStartAt && venue.coverageEndAt
+                      ? `${formatDateTime(venue.coverageStartAt)}–${formatDateTime(venue.coverageEndAt)} WIB · ${venue.candles.length} bucket`
+                      : (venue.reason ?? 'Belum ada histori yang diterima')}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2">
+                Awal histori mengikuti candle terverifikasi paling awal yang tersedia; exchange yang
+                listing lebih baru akan memiliki leading gap.
+              </p>
+            </div>
+          )}
+          <details className="mt-4 rounded-xl border border-slate-200 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25">
+              Data grafik aksesibel
+            </summary>
+            <div className="mt-4 max-h-80 overflow-auto">
+              <table className="w-full min-w-[680px] text-left text-xs">
+                <caption className="sr-only">
+                  Harga OHLC Indodax, Reku, dan Tokocrypto pada setiap waktu
+                </caption>
+                <thead className="sticky top-0 bg-white text-slate-500">
+                  <tr>
+                    <th scope="col" className="py-2 pr-3">
+                      Waktu (WIB)
+                    </th>
+                    {model.series.map((item) => (
+                      <th scope="col" key={item.venue} className="px-2 py-2 text-right">
+                        {VENUE_LABEL[item.venue]} · O/H/L/C
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.timestamps.map((timestamp, rowIndex) => (
+                    <tr key={timestamp} className="border-t border-slate-100">
+                      <th scope="row" className="py-2 pr-3 font-medium">
+                        {formatDateTime(new Date(timestamp).toISOString())}
+                      </th>
+                      {model.series.map((item) => {
+                        const candle = item.candles.find(
+                          (candidate) => Date.parse(candidate.openedAt) === timestamp,
+                        );
+                        return (
+                          <td key={item.venue} className="px-2 py-2 text-right tabular-nums">
+                            {item.points[rowIndex]?.[1] === null || !candle ? (
+                              'Gap · tidak tersedia'
+                            ) : (
+                              <>
+                                {formatIdr(candle.open, true)} / {formatIdr(candle.high, true)} /{' '}
+                                {formatIdr(candle.low, true)} / {formatIdr(candle.close, true)}
+                              </>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      )}
     </div>
   );
 }
@@ -1053,13 +1041,13 @@ export function MarketDetailPage({ pair }: { pair: string }) {
               <section aria-labelledby="movement-heading">
                 <div id="movement-heading">
                   <SectionHeading
-                    eyebrow="Rentang 24 jam · candle 1 jam"
-                    title="Satu chart, basis pergerakan yang sama"
-                    copy="Close setiap exchange direbase ke 0% pada bucket 1 jam pertama yang tersedia bersama dalam rentang 24 jam, sehingga bentuk pergerakan dapat dibandingkan meski level harga absolut berbeda."
+                    eyebrow="Perbandingan histori harga"
+                    title="Last price ketiga exchange dalam satu chart"
+                    copy="Line chart membandingkan harga close absolut tiap candle pada Indodax, Reku, dan Tokocrypto untuk timeframe 1 hari, 1 minggu, 1 tahun, atau seluruh histori yang tersedia."
                   />
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-                  <MovementChart venues={market.data.venues} />
+                  <MovementChart pair={pair} />
                 </div>
               </section>
 

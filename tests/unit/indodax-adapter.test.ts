@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IndodaxAdapter } from '@server/adapters/indodax.js';
+import { marketCandleRequest } from '@server/services/markets-service.js';
 
 describe('Indodax catalog status normalization', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -81,5 +82,41 @@ describe('Indodax catalog status normalization', () => {
       sourceValue: '8',
       sourceSemantics: 'DECIMAL_PLACES',
     });
+  });
+
+  it('builds Monday-aligned weekly candles from complete daily constituents', async () => {
+    const monday = Date.parse('2026-07-06T00:00:00.000Z');
+    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
+      void _input;
+      const candles = Array.from({ length: 7 }, (_, index) => ({
+        Time: String((monday + index * 86_400_000) / 1000),
+        Open: String(100 + index),
+        High: String(110 + index),
+        Low: String(90 + index),
+        Close: String(105 + index),
+        Volume: '2',
+      }));
+      return new Response(JSON.stringify(candles), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = marketCandleRequest('all', Date.parse('2026-07-13T01:00:00.000Z'));
+    const candles = await new IndodaxAdapter().getCandles('BTC', request);
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('tf')).toBe('1D');
+    expect(candles).toEqual([
+      expect.objectContaining({
+        openedAt: '2026-07-06T00:00:00.000Z',
+        closedAt: '2026-07-12T23:59:59.999Z',
+        open: '100',
+        high: '116',
+        low: '90',
+        close: '111',
+        baseVolume: '14',
+      }),
+    ]);
   });
 });

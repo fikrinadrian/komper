@@ -2,9 +2,90 @@
 
 ## Release recommendation
 
-**Conditional GO for the Markets increment and existing comparison as an internal, non-commercial evaluation. NO-GO for public beta, monetization, or reliability claims.**
+**Conditional GO for internal, non-commercial evaluation of the Highcharts four-period increment and existing comparison. Public beta, monetization, and reliability claims remain NO-GO.**
 
-The build, 66-test deterministic suite, full Chromium desktop/mobile browser suite, and core comparison/Markets flows are green. Retest evidence closes ML-007 through ML-010 and the WebSocket defects documented in the 2026-07-18 addendum below. Public release remains blocked by incomplete accessibility/live reliability evidence, the 72-hour shadow gate, and AC-16 because no product/legal approval evidence for commercial public-data use was observed.
+The repository gates are green at 78 deterministic tests. The last full browser run passed 16 tests with 2 intentional viewport-specific skips, and the post-fix Highcharts retest passed 4/4 focused desktop/mobile cases. Retest evidence closes ML-011 through ML-013: a failed requested period retains the prior successful chart with its actual label, one-venue/no-overlap history switches to observational wording, and actual bounds plus `All` per-venue coverage are disclosed. Public release remains independently blocked by incomplete accessibility/live reliability evidence, the 72-hour shadow gate, Highcharts license approval, and AC-16 because no product/legal approval evidence for commercial public-data use was observed.
+
+## Highcharts four-period increment final QA — 2026-07-18
+
+### Environment and tested scope
+
+- Environment: local Windows workspace, Node.js 24.14.0, pnpm 11.9.0, Asia/Jakarta; production Vite/tsup build and deterministic fixture market-data mode.
+- Browser matrix: Playwright Chromium desktop and Pixel 5 mobile against the built application.
+- Dependencies observed: `highcharts@13.0.0` and `@highcharts/react@5.2.2`, installed from pnpm rather than a runtime CDN.
+- Tested scope: the dedicated candle API; strict `1d|1w|1y|all` query; fixed interval and point caps; canonical candle validation; Indodax complete-week aggregation; absolute close series and null gaps; Highcharts loading and accessible module presence; all four controls in the healthy browser journey; existing aggregate-detail partial recovery regression.
+- Excluded as release evidence: live `1Y`/`All` completeness or redistribution rights, delayed/out-of-order and failed-period browser scenarios, chart visibility persistence through refresh, partial/no-overlap chart browser fixtures, screen-reader output, automated accessibility scan/contrast, 200% zoom, keyboard traversal of Highcharts internals, approved Highcharts license, representative payload/render performance, and 72-hour shadow behavior.
+
+### Commands and observed results
+
+| Command/evidence | Result |
+| --- | --- |
+| `pnpm run format:check` | PASS; all matched files use Prettier. |
+| `pnpm run typecheck` | PASS; zero TypeScript errors. |
+| `pnpm run lint` | PASS; zero warnings/errors. |
+| `pnpm test` | PASS; 20 files, 78 tests. |
+| Focused chart/API run: `pnpm exec vitest run tests/unit/market-chart.test.ts tests/unit/market-history.test.ts tests/unit/markets.test.ts tests/unit/indodax-adapter.test.ts tests/integration/api.test.ts` | PASS; 5 files, 32 tests. Covers absolute close values, explicit null gaps, invalid-candle quarantine, period mapping/caps, complete Monday weekly aggregation, API default/allowlist, and all four fixture periods. |
+| `pnpm run build` | PASS after the fixes; production client/server bundles generated. Main client is 380.28 kB / 114.72 kB gzip and Highcharts is route-lazy in a 437.76 kB / 151.87 kB gzip chunk; no approved performance threshold or representative-device render measurement exists. |
+| Last full `pnpm run test:e2e` before the focused defect retest | PASS; 16 passed and 2 expected viewport-specific skips in 59.1 seconds (68.4 seconds including prebuild). Desktop/mobile Markets coverage observes one Highcharts region and successful `1D`, `1W`, `1Y`, and `All` requests with `1h`, `4h`, `1d`, and `1w` labels. |
+| Post-fix focused Playwright: healthy all-period journey plus failed-period retention, Chromium desktop and mobile | PASS; 4/4 in 54.6 seconds. The new failure fixture observes `1Y` selected, the `1Y` error, retained `1D` chart/disclosure, and explicit retained-chart status. |
+| `pnpm audit --prod --json` | PASS for the observed registry advisory set; 0 info/low/moderate/high/critical production vulnerabilities across 82 dependencies. This is not license approval. |
+| `pnpm list highcharts @highcharts/react --depth 0` | PASS; resolves exactly `highcharts@13.0.0` and `@highcharts/react@5.2.2`. |
+| `git diff --check` | PASS; no whitespace errors. Line-ending conversion warnings were informational. |
+| TanStack QueryObserver failed-period probe | Original defect reproduction retained as evidence: identity placeholder data becomes undefined after rejection. The fix now stores the last successful same-pair response independently and the focused browser retest proves it remains rendered. |
+| Post-fix focused chart/API run: `pnpm exec vitest run tests/unit/market-chart.test.ts tests/unit/markets.test.ts tests/integration/api.test.ts` | PASS; 3 files, 24 tests. Covers maximum timestamp overlap, one-venue result, closed-bucket bound metadata, period caps, and API contracts. |
+
+### AC-25 through AC-33 assessment
+
+| AC | Result | Evidence and gap |
+| --- | --- | --- |
+| AC-25 | PASS for deterministic/healthy fixture scope | One lazy Highcharts Core `line` chart uses three stable venue IDs, raw accepted candle `close` values on the same IDR/time axes, a shared OHLC tooltip, stable colors plus dash patterns, `connectNulls: false`, a legend that prevents hiding the final data-bearing series, and an equivalent OHLC table. Unit tests prove exact absolute closes and null gaps; desktop/mobile Playwright observes the named Highcharts region. |
+| AC-26 | PARTIAL | Server validation rejects misaligned/current/invalid/conflicting candles; weekly alignment is Monday 00:00 UTC and the Indodax adapter aggregates only seven complete daily constituents with deterministic O/H/L/C. There is no equivalent contract evidence for every native Reku/Tokocrypto coarse interval, no incomplete-constituent fixture outside Indodax weekly aggregation, and no browser assertion that a middle gap remains visually discontinuous. |
+| AC-27 | PARTIAL | API allowlisting/default and the `24×1h`, `42×4h`, `365×1d`, `1000×1w` caps pass; all four controls and labels pass desktop/mobile. `requestedToAt` now reports the end of the latest fully closed canonical bucket. Browser coverage still does not assert exact frozen start inclusivity, rapid switching, or an intentionally late abandoned response. |
+| AC-28 | PASS for regression scope | Historical candles load through an independent query while the aggregate detail retry remains component-aware. Existing Playwright retains healthy pricing and recovers a failed Reku order book with one snapshot retry. It does not reset chart state in the covered healthy path. |
+| AC-29 | PARTIAL | The Accessibility module, meaningful chart region/title, dash-pattern descriptions, reduced animation, period button semantics, non-color status copy, and full semantic OHLC table are present; desktop/mobile journeys pass. Highcharts legend keyboard operation, value inspection without pointer, 200% zoom, screen-reader announcements, contrast, and automated accessibility rules were not observed. |
+| AC-30 | PASS for success/failure transition scope | ML-011 closed. The application retains a same-pair last-successful response independently of TanStack placeholder state, keeps its actual period label on request failure, identifies the requested period in status/error context, and retries the selected query. Focused desktop/mobile Playwright passes. An explicit late-abandoned-response race remains a coverage gap rather than an observed failure. |
+| AC-31 | PASS for deterministic semantics | ML-012 closed. The model calculates the maximum number of venues with a valid close at the same timestamp. Visible copy, chart title, and accessibility description switch to observational history below two overlapping venues; partial/unavailable venues and gap cells remain named. Unit tests prove overlap counts of two and one. |
+| AC-32 | PARTIAL | Stable Highcharts series IDs and the legend guard keep at least one data-bearing series visible. The selected period is local state and aggregate-detail refresh does not remount `MovementChart` by inspection. Venue visibility is held inside Highcharts rather than explicit application state, and no browser test proves that a hidden venue and selected non-default period survive chart/detail refresh or recovery without focus movement. |
+| AC-33 | PASS for available contract metadata | ML-013 closed. Adjacent copy identifies the displayed period, interval, WIB, actual first/last rendered bucket, generation time, and close-versus-executable semantics. `All` lists each venue's actual accepted coverage start/end and bucket count, names unavailable history, and explains later-listing leading gaps without claiming lifetime completeness. |
+
+### Open defects
+
+#### ML-011 — P1 — CLOSED — failed period request removed the prior successful chart
+
+- Affected: AC-30; race/error trust and continuity.
+- Repro: load a successful `1D` query, select `1Y`, then reject the `1Y` request. A direct QueryObserver probe using the component's identity `placeholderData` policy emitted `1d` success, `1d` placeholder while fetching, then error with `data` undefined.
+- Observed: `MovementChart` renders old data only while the new request is pending. After failure `chart.data` is absent, so the previous chart, accessible table, and previous-period disclosure are removed; only the generic error panel remains.
+- Expected: retain the last successful chart atomically with its actual period label, announce the requested-period failure, and retry the current requested period without allowing an abandoned response to overwrite it.
+- Fix/retest: `MovementChart` retains the last non-placeholder successful same-pair response separately from query placeholder state and uses it after an error. Focused Chromium desktop/mobile Playwright passes the forced `1Y` failure, explicit retained-`1D` status, selected `1Y` state, and retained `1D` disclosure. Rapid multi-period and intentionally late response coverage remains open.
+
+#### ML-012 — P1 — CLOSED — partial history could make an invalid comparison claim
+
+- Affected: AC-31 and AC-29 semantics.
+- Repro: return valid candles for only one venue, or two venue series whose timestamps never overlap.
+- Observed: the component unconditionally renders comparative text, including the accessibility description “Perbandingan last price berdasarkan close candle”, without calculating overlapping eligible venue count.
+- Expected: call the chart observational when fewer than two venues share at least one valid timestamp, retain every configured venue and reason, and avoid any three-venue movement/comparison conclusion.
+- Fix/retest: the chart model now exposes `maxOverlappingVenues`; unit tests pass for two-overlap and one-venue cases. The visible description, Highcharts title, and accessibility description use observational wording when the count is below two. A dedicated browser fixture for disjoint two-series history remains missing.
+
+#### ML-013 — P2 — CLOSED — actual chart bounds and `All` retention were not disclosed
+
+- Affected: AC-27 and AC-33.
+- Repro: open any period, especially `All`, and inspect the copy adjacent to the chart and the per-venue API coverage metadata.
+- Observed: the UI shows period, interval, generation timestamp, WIB, and price semantics only. It does not show actual first/last rendered buckets or per-venue retention/later-start information. The response's `requestedToAt` is the current request time, not a canonical fully closed-bucket boundary.
+- Expected: disclose actual earliest/latest rendered buckets, use unambiguous closed-bucket bounds, and for `All` show each known venue's retained-history start/later listing and limitation without implying lifetime completeness.
+- Fix/retest: the service reports the prior canonical bucket end, chart copy reports actual rendered first/last timestamps, and `All` lists per-venue accepted start/end/count plus later-listing leading-gap semantics. Focused API/unit tests pass. Exact frozen-clock and unequal-live-retention browser fixtures remain missing.
+
+### Missing coverage and residual risk
+
+- The post-fix browser retest exercises chart request failure and retained prior-period labeling. It still does not exercise an intentionally late old response, partial/no-overlap browser fixtures, repeated chart-only retry recovery, or venue-visibility persistence.
+- All deterministic fixture periods are generated to their requested cap. They do not prove that live Reku, Tokocrypto, or Indodax can lawfully and reliably supply complete `1Y`/`All` coverage, that source-native coarse candles match canonical aggregation semantics, or that exchange pagination/limits will honor the request.
+- The client builds a timestamp array from the earliest through latest observed point. The 1,000-point-per-venue server cap bounds accepted candles, but sparse or malformed very-distant timestamps need a defensive client span/point-count test so array expansion cannot exceed the intended 3,000-point render budget.
+- The Highcharts chunk is lazy but material. No approved JS budget, payload budget, representative mobile render measurement, CSP smoke, or production-license record was observed. The installed package itself states that a valid license is required.
+- Accessibility remains partial: semantic fallback data exists, but no screen-reader, 200% zoom, automated critical/serious rule scan, contrast review, or verified keyboard traversal of legend/points was recorded.
+- AC-16/data redistribution rights, an applicable Highcharts deployment license, the 72-hour shadow gate, production observability, and long-period performance thresholds remain independent release blockers.
+
+### Highcharts increment release recommendation
+
+QA recommends **conditional GO for internal, non-commercial evaluation of the Highcharts four-period increment**. ML-011 through ML-013 are closed by focused deterministic and desktop/mobile browser evidence. Public/commercial release remains **NO-GO** because the Highcharts license, venue data rights, live long-history completeness, assistive-technology review, representative performance thresholds, late-response race coverage, and 72-hour shadow evidence remain unresolved.
 
 ## Environment and tested scope
 
@@ -127,7 +208,9 @@ The live check observed the same 18 common assets stated in the PRD: ADA, ARB, A
 4. Run the required 72-hour shadow evaluation and record schema acceptance, pair coverage, source/cache age, gaps, rate limits, and residual risk.
 5. Obtain and record product/legal approval for public commercial display, caching, and derived data at each venue. Until then retain the internal evaluation label and do not monetize.
 
-## Markets increment verification — 2026-07-18
+## Pre-Highcharts Markets baseline verification — 2026-07-18 (historical evidence)
+
+This section records the prior fixed-24-hour SVG-chart baseline. Its AC-25–AC-29 wording and release recommendation are superseded by the Highcharts assessment at the top of this report.
 
 ### Environment and tested scope
 
@@ -205,13 +288,13 @@ The live check observed the same 18 common assets stated in the PRD: ADA, ARB, A
 - Static mobile evidence cannot prove scroll affordance or screen-reader relationships; the targeted DOM probe proves internal scrolling and headers, not usability with assistive technology.
 - AC-16, historical storage/display rights, the 72-hour shadow gate, and reliability claims remain blocked independently of the Markets implementation defects.
 
-### Markets release recommendation
+### Historical Markets baseline release recommendation
 
-QA recommends **conditional GO for internal, non-commercial evaluation of the Markets increment**. ML-007 through ML-010 are closed by deterministic and focused browser evidence. Public beta remains **NO-GO** because AC-27 and AC-29 retain announcement/assistive-technology evidence gaps, live 24-hour history is incomplete for Reku in the observed smoke, and the independent shadow/legal gates remain unmet.
+At that baseline, QA recommended **conditional GO for internal, non-commercial evaluation of the Markets increment**. ML-007 through ML-010 were closed by deterministic and focused browser evidence. The current Highcharts build has its own conditional internal recommendation at the top of this report after ML-011 through ML-013 were closed.
 
-## Final QA decision
+## Pre-Highcharts final QA decision (superseded for the current build)
 
-The final green format/typecheck/lint/build gates, 66 deterministic tests, and full Playwright result of 16 passed/2 expected skips demonstrate build integrity and close ML-007 through ML-010 plus the automated WebSocket regressions below. QA recommends **conditional GO for internal, non-commercial evaluation of both Markets and the existing size-aware comparison**. Public beta, monetization, and reliability claims remain **NO-GO** until the remaining AC-27/AC-29 evidence gaps, 72-hour shadow evidence, live coverage limitations, and legal/data-rights gates are resolved.
+The then-green format/typecheck/lint/build gates, 66 deterministic tests, and full Playwright result of 16 passed/2 expected skips demonstrated build integrity and closed ML-007 through ML-010 plus the automated WebSocket regressions below. The current build is governed by the conditional internal recommendation and public-release NO-GO at the top of this report.
 
 ## WebSocket/SSE increment verification — 2026-07-18
 

@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { validateBook } from '@server/domain/orderbook.js';
-import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type {
+  CanonicalBook,
+  MarketCandleRequest,
+  VenueAdapter,
+  VenueInstrument,
+} from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
 import { decimalPlacesRule, stepRule } from '@server/domain/increments.js';
 import { fetchPublicJson, nowIso } from './http.js';
@@ -59,6 +64,64 @@ const candlesSchema = z.array(
     Volume: z.string().optional(),
   }),
 );
+type IndodaxCandle = z.infer<typeof candlesSchema>[number];
+
+function mapCandle(candle: IndodaxCandle, intervalMs: number): MarketCandle {
+  const openedAt = new Decimal(candle.Time).mul(1000).toNumber();
+  return {
+    openedAt: new Date(openedAt).toISOString(),
+    closedAt: new Date(openedAt + intervalMs - 1).toISOString(),
+    open: candle.Open,
+    high: candle.High,
+    low: candle.Low,
+    close: candle.Close,
+    baseVolume: candle.Volume,
+  };
+}
+
+function aggregateDailyWeeks(candles: IndodaxCandle[]): MarketCandle[] {
+  const byWeek = new Map<number, IndodaxCandle[]>();
+  for (const candle of candles) {
+    const openedAt = new Decimal(candle.Time).mul(1000).toNumber();
+    const date = new Date(openedAt);
+    const monday =
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) -
+      ((date.getUTCDay() + 6) % 7) * 86_400_000;
+    const group = byWeek.get(monday) ?? [];
+    group.push(candle);
+    byWeek.set(monday, group);
+  }
+
+  return [...byWeek.entries()]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([monday, group]) => {
+      const sorted = group.sort((left, right) =>
+        new Decimal(left.Time).cmp(new Decimal(right.Time)),
+      );
+      const complete =
+        sorted.length === 7 &&
+        sorted.every(
+          (candle, index) =>
+            new Decimal(candle.Time).mul(1000).toNumber() === monday + index * 86_400_000,
+        );
+      if (!complete) return [];
+      const volumes = sorted.map((candle) => candle.Volume).filter((value) => value !== undefined);
+      return [
+        {
+          openedAt: new Date(monday).toISOString(),
+          closedAt: new Date(monday + 7 * 86_400_000 - 1).toISOString(),
+          open: sorted[0].Open,
+          high: Decimal.max(...sorted.map((candle) => new Decimal(candle.High))).toFixed(),
+          low: Decimal.min(...sorted.map((candle) => new Decimal(candle.Low))).toFixed(),
+          close: sorted.at(-1)!.Close,
+          baseVolume:
+            volumes.length === sorted.length
+              ? Decimal.sum(...volumes.map((value) => new Decimal(value!))).toFixed()
+              : undefined,
+        },
+      ];
+    });
+}
 
 export class IndodaxAdapter implements VenueAdapter {
   readonly venue = 'INDODAX' as const;
@@ -147,24 +210,29 @@ export class IndodaxAdapter implements VenueAdapter {
     }));
   }
 
-  async getCandles(asset: string, signal?: AbortSignal): Promise<MarketCandle[]> {
-    const now = Math.floor(Date.now() / 1000);
+  async getCandles(
+    asset: string,
+    request?: MarketCandleRequest,
+    signal?: AbortSignal,
+  ): Promise<MarketCandle[]> {
+    const intervalMs = request?.intervalMs ?? 3_600_000;
+    const limit = request?.limit ?? 24;
+    const toMs = request?.toMs ?? Date.now();
+    const fromMs = request?.fromMs ?? toMs - 25 * 3_600_000;
     const url = new URL('https://indodax.com/tradingview/history_v2');
-    url.searchParams.set('from', String(now - 25 * 60 * 60));
-    url.searchParams.set('to', String(now));
-    url.searchParams.set('tf', '60');
+    url.searchParams.set('from', String(Math.floor(fromMs / 1000)));
+    url.searchParams.set('to', String(Math.floor(toMs / 1000)));
+    const aggregateWeeks = request?.interval === '1w';
+    const timeframe = aggregateWeeks
+      ? '1D'
+      : request?.interval === '1d'
+        ? '1D'
+        : String(intervalMs / 60_000);
+    url.searchParams.set('tf', timeframe);
     url.searchParams.set('symbol', `${asset.toUpperCase()}IDR`);
     const raw = candlesSchema.parse(await fetchPublicJson(url, HOSTS, signal));
-    return raw.slice(-24).map((candle) => ({
-      openedAt: new Date(new Decimal(candle.Time).mul(1000).toNumber()).toISOString(),
-      closedAt: new Date(
-        new Decimal(candle.Time).mul(1000).plus(3_599_999).toNumber(),
-      ).toISOString(),
-      open: candle.Open,
-      high: candle.High,
-      low: candle.Low,
-      close: candle.Close,
-      baseVolume: candle.Volume,
-    }));
+    return aggregateWeeks
+      ? aggregateDailyWeeks(raw).slice(-limit)
+      : raw.slice(-limit).map((candle) => mapCandle(candle, intervalMs));
   }
 }

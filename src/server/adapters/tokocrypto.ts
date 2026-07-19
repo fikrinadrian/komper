@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { validateBook } from '@server/domain/orderbook.js';
-import type { CanonicalBook, VenueAdapter, VenueInstrument } from '@server/domain/types.js';
+import type {
+  CanonicalBook,
+  MarketCandleRequest,
+  VenueAdapter,
+  VenueInstrument,
+} from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
 import { stepRule, unverifiedRule } from '@server/domain/increments.js';
 import { fetchPublicJson, nowIso } from './http.js';
@@ -273,7 +278,11 @@ export class TokocryptoAdapter implements VenueAdapter {
     }));
   }
 
-  async getCandles(asset: string, signal?: AbortSignal): Promise<MarketCandle[]> {
+  async getCandles(
+    asset: string,
+    request?: MarketCandleRequest,
+    signal?: AbortSignal,
+  ): Promise<MarketCandle[]> {
     const marketSegment = this.segmentByAsset.get(asset) ?? 'spot-type-1';
     const isType3 = marketSegment === 'spot-type-3';
     const url = new URL(
@@ -281,13 +290,19 @@ export class TokocryptoAdapter implements VenueAdapter {
         ? 'https://cloudme-toko.2meta.app/api/v1/klines'
         : 'https://www.tokocrypto.site/api/v3/klines',
     );
+    const interval = request?.interval ?? '1h';
+    const limit = request?.limit ?? 24;
     url.searchParams.set('symbol', `${asset.toUpperCase()}IDR`);
-    url.searchParams.set('interval', '1h');
-    url.searchParams.set('limit', '24');
+    url.searchParams.set('interval', interval);
+    url.searchParams.set('limit', String(limit));
+    if (request) {
+      url.searchParams.set('startTime', String(request.fromMs));
+      url.searchParams.set('endTime', String(request.toMs));
+    }
     const raw = candlesSchema.parse(
       await fetchPublicJson(url, isType3 ? TYPE_3_DEPTH_HOSTS : DEPTH_HOSTS, signal),
     );
-    return raw.slice(-24).map((candle) => ({
+    return raw.slice(-limit).map((candle) => ({
       openedAt: new Date(new Decimal(candle[0]).toNumber()).toISOString(),
       closedAt: new Date(new Decimal(candle[6]).toNumber()).toISOString(),
       open: candle[1],

@@ -72,6 +72,48 @@ describe('Market Lens BFF', () => {
     }
   });
 
+  it.each([
+    ['1d', '1h', 24],
+    ['1w', '4h', 42],
+    ['1y', '1d', 365],
+  ])('returns bounded %s comparative candle history', async (period, interval, count) => {
+    const response = await request(app)
+      .get(`/api/markets/btc-idr/candles?period=${period}`)
+      .expect(200);
+    expect(response.body).toMatchObject({ pair: 'BTC-IDR', period, interval });
+    expect(response.body.maxBucketsPerVenue).toBe(count);
+    expect(Date.parse(response.body.requestedFromAt)).toBeLessThan(
+      Date.parse(response.body.requestedToAt),
+    );
+    expect(Date.parse(response.body.requestedToAt)).toBeLessThanOrEqual(
+      Date.parse(response.body.generatedAt),
+    );
+    expect(response.body.venues).toHaveLength(3);
+    for (const venue of response.body.venues) {
+      expect(venue).toMatchObject({ status: 'AVAILABLE' });
+      expect(venue.candles).toHaveLength(count);
+    }
+  });
+
+  it('returns all approved weekly history without exceeding its point cap', async () => {
+    const response = await request(app).get('/api/markets/btc-idr/candles?period=all').expect(200);
+    expect(response.body).toMatchObject({ pair: 'BTC-IDR', period: 'all', interval: '1w' });
+    for (const venue of response.body.venues) {
+      expect(venue).toMatchObject({ status: 'AVAILABLE' });
+      expect(venue.candles.length).toBeGreaterThan(0);
+      expect(venue.candles.length).toBeLessThanOrEqual(1000);
+    }
+  });
+
+  it('defaults candle history to 1d and rejects unknown periods', async () => {
+    const response = await request(app).get('/api/markets/btc-idr/candles').expect(200);
+    expect(response.body).toMatchObject({ period: '1d', interval: '1h' });
+    await request(app).get('/api/markets/btc-idr/candles?period=30d').expect(400);
+    await request(app).get('/api/markets/btc-idr/candles?period=1d&period=1w').expect(400);
+    await request(app).get('/api/markets/btc-usdt/candles?period=1d').expect(400);
+    await request(app).get('/api/markets/nope-idr/candles?period=1d').expect(404);
+  });
+
   it('distinguishes malformed and unavailable market detail pairs', async () => {
     await request(app).get('/api/markets/btc-usdt').expect(400);
     const response = await request(app).get('/api/markets/nope-idr').expect(404);
