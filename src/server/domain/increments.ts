@@ -82,6 +82,14 @@ export function validateBookIncrements(
   for (const level of [...book.bids, ...book.asks]) {
     if (priceStep && !decimal(level.price).mod(priceStep).eq(0))
       throw new Error('misaligned_rules');
-    if (!decimal(level.quantity).mod(quantityStep).eq(0)) throw new Error('misaligned_rules');
+    // Some venues publish aggregate base quantities derived from quote notional / price.
+    // Those levels remain valid liquidity but are not expected to sit on the executable
+    // order-quantity lattice. The executable quantity is still quantized separately.
+    if (
+      book.quantityLevelSemantics !== 'DERIVED_FROM_NOTIONAL' &&
+      !decimal(level.quantity).mod(quantityStep).eq(0)
+    ) {
+      throw new Error('misaligned_rules');
+    }
   }
 }

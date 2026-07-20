@@ -23,6 +23,7 @@ export type CanonicalBook = {
   processedAt: string;
   freshnessIndependentlyVerified: boolean;
   synchronization: 'SNAPSHOT';
+  quantityLevelSemantics?: 'EXECUTABLE_INCREMENT' | 'DERIVED_FROM_NOTIONAL';
   minimumNotional?: string;
 };
 
@@ -38,6 +39,8 @@ export type VenueInstrument = {
   minimumQuantity?: string;
   marketPriceIncrementRule: IncrementRule;
   marketQuantityIncrementRule: IncrementRule;
+  buyQuoteIncrementRule?: IncrementRule;
+  buyOutcomeIncrementRule?: IncrementRule;
   metadataVersion: string;
 };
 

@@ -5,27 +5,45 @@ import { TokocryptoAdapter } from '@server/adapters/tokocrypto.js';
 describe('venue-specific increment contracts', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('maps documented Reku decimal-count fields without integer-shape guessing', async () => {
+  it('uses the reviewed Reku client contract instead of volume display decimals', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(
         async () =>
           new Response(
-            JSON.stringify([{ cd: 'BTC', status: 1, price_decimals: 2, volume_decimals: 8 }]),
+            JSON.stringify([
+              {
+                cd: 'BTC',
+                status: 1,
+                digits: 10000,
+                price_decimals: 0,
+                volume_decimals: 0,
+              },
+            ]),
             { status: 200 },
           ),
       ),
     );
     const [instrument] = await new RekuAdapter().discover();
     expect(instrument.marketPriceIncrementRule).toMatchObject({
-      normalizedStep: '0.01',
-      sourceField: 'price_decimals',
-      sourceSemantics: 'DECIMAL_PLACES',
+      normalizedStep: '10000',
+      sourceField: 'digits',
+      sourceSemantics: 'STEP_SIZE',
+      evidenceClass: 'OFFICIAL_WEB_CLIENT_OBSERVED',
     });
     expect(instrument.marketQuantityIncrementRule).toMatchObject({
       normalizedStep: '0.00000001',
-      sourceField: 'volume_decimals',
+      sourceField: 'officialWebClient.sell.amount.scale',
       sourceSemantics: 'DECIMAL_PLACES',
+      evidenceClass: 'OFFICIAL_WEB_CLIENT_OBSERVED',
+    });
+    expect(instrument.buyQuoteIncrementRule).toMatchObject({
+      normalizedStep: '1',
+      sourceField: 'officialWebClient.buy.amount.scale',
+    });
+    expect(instrument.buyOutcomeIncrementRule).toMatchObject({
+      normalizedStep: '0.00000001',
+      sourceField: 'officialWebClient.buy.estimation.scale',
     });
   });
 

@@ -69,6 +69,9 @@ export type IncrementRule = {
   sourceSemantics: 'STEP_SIZE' | 'DECIMAL_PLACES' | 'EXPLICITLY_DISABLED';
   metadataVersion: string;
   verifiedAt?: string;
+  evidenceClass?: 'VENUE_API_DOCUMENTED' | 'OFFICIAL_WEB_CLIENT_OBSERVED';
+  sourceUrl?: string;
+  capturedAt?: string;
 };
 
 export type FeeAssumption = {
@@ -104,6 +107,8 @@ export type VenueEstimate = {
   levelsConsumed?: number;
   priceIncrementRule: IncrementRule;
   quantityIncrementRule: IncrementRule;
+  inputIncrementRule?: IncrementRule;
+  inputDenomination?: 'BASE' | 'QUOTE';
   ruleMetadataVersion: string;
   fee: FeeAssumption;
   estimatedFee?: string;

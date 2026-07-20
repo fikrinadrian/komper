@@ -57,8 +57,11 @@ export class ComparisonService {
           venueInstrument?.marketPriceIncrementRule ??
           unverifiedRule('missing', undefined, 'STEP_SIZE', metadataVersion);
         const quantityIncrementRule =
+          (side === 'buy' ? venueInstrument?.buyOutcomeIncrementRule : undefined) ??
           venueInstrument?.marketQuantityIncrementRule ??
           unverifiedRule('missing', undefined, 'STEP_SIZE', metadataVersion);
+        const buyQuoteIncrementRule =
+          side === 'buy' ? venueInstrument?.buyQuoteIncrementRule : undefined;
         const base: Pick<
           VenueEstimate,
           | 'venue'
@@ -71,6 +74,8 @@ export class ComparisonService {
           | 'externalUrl'
           | 'priceIncrementRule'
           | 'quantityIncrementRule'
+          | 'inputIncrementRule'
+          | 'inputDenomination'
           | 'ruleMetadataVersion'
           | 'transport'
           | 'synchronization'
@@ -87,6 +92,8 @@ export class ComparisonService {
           externalUrl: EXTERNAL_URLS[adapter.venue],
           priceIncrementRule,
           quantityIncrementRule,
+          inputIncrementRule: buyQuoteIncrementRule ?? quantityIncrementRule,
+          inputDenomination: buyQuoteIncrementRule ? 'QUOTE' : 'BASE',
           ruleMetadataVersion: metadataVersion,
           transport: 'REST_SNAPSHOT',
         };
@@ -128,7 +135,25 @@ export class ComparisonService {
             };
           }
 
-          const rawBuy = side === 'buy' ? walkBuy(book.asks, amount) : undefined;
+          const executableQuoteBudget = buyQuoteIncrementRule
+            ? quantizeDown(amount, buyQuoteIncrementRule)
+            : amount;
+          if (buyQuoteIncrementRule && decimal(executableQuoteBudget).eq(0)) {
+            return {
+              ...base,
+              ...provenance,
+              status: 'BELOW_MINIMUM',
+              statusReason: 'Budget menjadi nol setelah dibulatkan turun ke increment input venue.',
+              requestedQuoteBudget: amount,
+              unspentQuoteAmount: amount,
+              roundingMode: 'FLOOR',
+              receivedAt: book.receivedAt,
+              sourceEventAt: book.sourceEventAt,
+              ageMs,
+              freshnessIndependentlyVerified: book.freshnessIndependentlyVerified,
+            };
+          }
+          const rawBuy = side === 'buy' ? walkBuy(book.asks, executableQuoteBudget) : undefined;
           const rawBaseQuantity = rawBuy?.grossOutcome ?? amount;
           const executableBaseQuantity = quantizeDown(rawBaseQuantity, quantityIncrementRule);
           const quantizationAdjustment = plain(
@@ -153,10 +178,30 @@ export class ComparisonService {
             };
           }
 
-          const walk =
+          const rawWalk =
             side === 'buy'
-              ? walkBuyQuantity(book.asks, executableBaseQuantity)
+              ? buyQuoteIncrementRule
+                ? rawBuy!
+                : walkBuyQuantity(book.asks, executableBaseQuantity)
               : walkSell(book.bids, executableBaseQuantity);
+          const walk = buyQuoteIncrementRule
+            ? {
+                ...rawWalk,
+                grossOutcome: executableBaseQuantity,
+                grossAveragePrice: plain(
+                  decimal(rawWalk.filledInput).div(decimal(executableBaseQuantity)),
+                  8,
+                ),
+                slippageBps: plain(
+                  decimal(rawWalk.filledInput)
+                    .div(decimal(executableBaseQuantity))
+                    .div(decimal(rawWalk.topOfBookPrice))
+                    .minus(1)
+                    .mul(10_000),
+                  4,
+                ),
+              }
+            : rawWalk;
           const filledNotional = side === 'buy' ? walk.filledInput : walk.grossOutcome;
           const unspentQuoteAmount =
             side === 'buy'

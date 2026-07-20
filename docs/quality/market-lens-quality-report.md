@@ -4,7 +4,33 @@
 
 **Conditional GO for internal, non-commercial evaluation of the Highcharts four-period increment and existing comparison. Public beta, monetization, and reliability claims remain NO-GO.**
 
-The repository gates are green at 78 deterministic tests. The last full browser run passed 16 tests with 2 intentional viewport-specific skips, and the post-fix Highcharts retest passed 4/4 focused desktop/mobile cases. Retest evidence closes ML-011 through ML-013: a failed requested period retains the prior successful chart with its actual label, one-venue/no-overlap history switches to observational wording, and actual bounds plus `All` per-venue coverage are disclosed. Public release remains independently blocked by incomplete accessibility/live reliability evidence, the 72-hour shadow gate, Highcharts license approval, and AC-16 because no product/legal approval evidence for commercial public-data use was observed.
+The repository gates are green at 81 deterministic tests. The latest full browser run passed 18 tests with 2 intentional viewport-specific skips. Retest evidence closes ML-011 through ML-014, including the Reku aggregate-quantity false rejection described below. Public release remains independently blocked by incomplete accessibility/live reliability evidence, the 72-hour shadow gate, Highcharts license approval, AC-16, and the need to confirm the observed Reku web-client execution rules against a documented API or authenticated non-destructive boundary tests.
+
+## Reku comparison-rule correction — 2026-07-19
+
+### ML-014 — P1 — CLOSED for internal evaluation — valid Reku aggregate book was excluded as `UNVERIFIED_RULES`
+
+- Affected: AC-03, AC-04, AC-10, AC-11, and gross ranking completeness.
+- Repro: live BTC metadata returned `volume_decimals=0`, while the public book contained fractional aggregate coin totals. The adapter converted the display field to quantity step `1`; quantity-modulo validation then raised `misaligned_rules`, removed Reku's gross result, and showed the generic “Aturan belum terverifikasi” label.
+- Cause: one quantity rule was incorrectly used for side-specific order input, buy outcome rounding, and aggregate-book validation. Reku book quantities are reported/derived from quote notional and price and are not order-entry lattice values.
+- Fix: ADR-004 separates book quantity semantics from side/denomination rules. Reku buy input uses whole IDR and walks the quote budget directly; buy outcome and sell base input use the reviewed official-client eight-decimal floor; price movement uses Reku `digits`; aggregate book quantities skip only the inapplicable quantity-modulo check. All structural, price, freshness, synchronization, and rule checks remain fail-closed.
+- Provenance: official Reku trade bundle `pages/trade/[symbol]-734b58cded9e0058.js`, captured 2026-07-19, SHA-256 `f70980ea71240a3c9abeb080fb8707fd065714a24b8986a73fc04094634a943b`, recorded as `OFFICIAL_WEB_CLIENT_OBSERVED` rather than a matching-engine guarantee.
+- Retest: deterministic buy/sell regressions pass. Point-in-time live BTC buy Rp5,000,000 and sell 0.001 BTC both returned Reku `ELIGIBLE`; each comparison had 3 eligible venues and a gross ranking.
+
+### Verification evidence
+
+| Command/evidence | Result |
+| --- | --- |
+| `pnpm run format:check` | PASS; all matched files use Prettier. |
+| `pnpm run typecheck` | PASS; zero TypeScript errors. |
+| `pnpm run lint` | PASS; zero warnings/errors. |
+| `pnpm test` | PASS; 20 files, 81 tests. Includes Reku client-rule provenance, derived aggregate quantity, price misalignment, quote-input buy, and base-input sell regressions. |
+| `pnpm run build` | PASS; production Vite and tsup bundles generated. |
+| `pnpm run test:e2e` | PASS; 18 passed and 2 expected viewport-specific skips across desktop/mobile Chromium. |
+| Live public BTC smoke | PASS point-in-time; Reku buy and sell were `ELIGIBLE`, `eligibleVenueCount=3`, and `rankingBasis=GROSS`. This is contract smoke, not reliability or guaranteed-execution evidence. |
+| `git diff --check` | PASS; no whitespace errors. |
+
+Residual risk: the recorded official-client behavior is sufficient only for the existing internal, non-commercial evaluation boundary. A new Reku client bundle requires review. Public executable-price claims remain NO-GO until Reku documents the rules or authenticated non-destructive tests verify price step, buy/sell precision, minimums, and representative asset classes.
 
 ## Highcharts four-period increment final QA — 2026-07-18
 

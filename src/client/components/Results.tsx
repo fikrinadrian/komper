@@ -203,6 +203,18 @@ function EstimateCard({
       <details className="mt-3 rounded-xl border border-slate-200 px-3.5 py-3 text-xs text-slate-600">
         <summary className="cursor-pointer font-bold text-ink">Provenance aturan increment</summary>
         <dl className="mt-2 grid gap-2">
+          {estimate.inputIncrementRule && (
+            <div>
+              <dt className="font-bold">
+                Input eksekusi ({estimate.inputDenomination === 'QUOTE' ? 'IDR' : 'aset'})
+              </dt>
+              <dd>
+                {estimate.inputIncrementRule.sourceField} ={' '}
+                {estimate.inputIncrementRule.sourceValue ?? 'tidak tersedia'} Â· step{' '}
+                {estimate.inputIncrementRule.normalizedStep ?? estimate.inputIncrementRule.state}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="font-bold">Harga</dt>
             <dd>

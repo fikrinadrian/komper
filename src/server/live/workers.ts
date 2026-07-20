@@ -247,6 +247,7 @@ export class RekuBookWorker extends ConnectionSupervisor {
       processedAt: new Date(this.clock.now()).toISOString(),
       freshnessIndependentlyVerified: false,
       synchronization: 'SNAPSHOT',
+      quantityLevelSemantics: 'DERIVED_FROM_NOTIONAL',
     });
     if (this.firstSnapshot) {
       const rest = await this.adapter.getBook(this.instrument.baseAsset);

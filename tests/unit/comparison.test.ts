@@ -4,12 +4,61 @@ import type { VenueAdapter } from '@server/domain/types.js';
 import type { FeeAssumption, Venue } from '@shared/contracts.js';
 import { CatalogService } from '@server/services/catalog-service.js';
 import { ComparisonService } from '@server/services/comparison-service.js';
+import type { CanonicalBook, VenueInstrument } from '@server/domain/types.js';
+import { stepRule } from '@server/domain/increments.js';
+import {
+  rekuBuyOutcomeRule,
+  rekuBuyQuoteRule,
+  rekuSellBaseRule,
+} from '@server/registry/reku-execution-rules.js';
 
 const adapters = [
   new FixtureAdapter('INDODAX'),
   new FixtureAdapter('REKU'),
   new FixtureAdapter('TOKOCRYPTO'),
 ];
+
+class RekuAggregateAdapter implements VenueAdapter {
+  readonly venue = 'REKU' as const;
+  private readonly metadataVersion = 'reku-test-client-contract';
+
+  async discover(): Promise<VenueInstrument[]> {
+    return [
+      {
+        venue: this.venue,
+        marketSegment: 'spot',
+        venueSymbol: 'BTC_IDR',
+        baseAsset: 'BTC',
+        quoteAsset: 'IDR',
+        active: true,
+        directIdr: true,
+        marketPriceIncrementRule: stepRule('digits', '10000', this.metadataVersion),
+        marketQuantityIncrementRule: rekuSellBaseRule(this.metadataVersion),
+        buyQuoteIncrementRule: rekuBuyQuoteRule(this.metadataVersion),
+        buyOutcomeIncrementRule: rekuBuyOutcomeRule(this.metadataVersion),
+        metadataVersion: this.metadataVersion,
+      },
+    ];
+  }
+
+  async getBook(): Promise<CanonicalBook> {
+    const now = new Date().toISOString();
+    return {
+      schemaVersion: '1',
+      venue: this.venue,
+      marketSegment: 'spot',
+      venueSymbol: 'BTC_IDR',
+      canonicalInstrument: { baseAsset: 'BTC', quoteAsset: 'IDR' },
+      bids: [{ price: '1163000000', quantity: '0.00082723129836629' }],
+      asks: [{ price: '1163900000', quantity: '0.054373532090386' }],
+      receivedAt: now,
+      processedAt: now,
+      freshnessIndependentlyVerified: false,
+      synchronization: 'SNAPSHOT',
+      quantityLevelSemantics: 'DERIVED_FROM_NOTIONAL',
+    };
+  }
+}
 
 describe('health-gated venue comparison', () => {
   it('ranks at least two healthy venues and labels gross basis when fees are unknown', async () => {
@@ -120,5 +169,43 @@ describe('health-gated venue comparison', () => {
       category: 'schema',
     });
     warn.mockRestore();
+  });
+
+  it('compares Reku buys using quote input without rejecting aggregate book quantities', async () => {
+    const localAdapters: VenueAdapter[] = [
+      new FixtureAdapter('INDODAX'),
+      new RekuAggregateAdapter(),
+      new FixtureAdapter('TOKOCRYPTO'),
+    ];
+    const result = await new ComparisonService(
+      localAdapters,
+      new CatalogService(localAdapters),
+    ).compare('BTC', 'buy', '5000000');
+    const reku = result.results.find((item) => item.venue === 'REKU')!;
+
+    expect(reku.status).toBe('ELIGIBLE');
+    expect(reku.grossOutcome).toBe('0.0042959');
+    expect(reku.executableBaseQuantity).toBe('0.0042959');
+    expect(reku.filledNotional).toBe('5000000');
+    expect(reku.unspentQuoteAmount).toBe('0');
+    expect(reku.inputDenomination).toBe('QUOTE');
+  });
+
+  it('floors Reku sell input independently from aggregate book precision', async () => {
+    const localAdapters: VenueAdapter[] = [
+      new FixtureAdapter('INDODAX'),
+      new RekuAggregateAdapter(),
+      new FixtureAdapter('TOKOCRYPTO'),
+    ];
+    const result = await new ComparisonService(
+      localAdapters,
+      new CatalogService(localAdapters),
+    ).compare('BTC', 'sell', '0.00082723129836629');
+    const reku = result.results.find((item) => item.venue === 'REKU')!;
+
+    expect(reku.status).toBe('ELIGIBLE');
+    expect(reku.executableBaseQuantity).toBe('0.00082723');
+    expect(reku.unsoldBaseAmount).toBe('0.00000000129836629');
+    expect(reku.grossOutcome).toBe('962068.49');
   });
 });

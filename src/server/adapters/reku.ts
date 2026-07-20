@@ -8,7 +8,13 @@ import type {
   VenueInstrument,
 } from '@server/domain/types.js';
 import type { MarketCandle, MarketTicker, MarketTrade } from '@shared/contracts.js';
-import { decimalPlacesRule } from '@server/domain/increments.js';
+import {
+  REKU_CLIENT_RULE_VERSION,
+  rekuBuyOutcomeRule,
+  rekuBuyQuoteRule,
+  rekuPriceRule,
+  rekuSellBaseRule,
+} from '@server/registry/reku-execution-rules.js';
 import { fetchPublicJson, nowIso } from './http.js';
 
 const HOSTS = ['api.reku.id'] as const;
@@ -18,6 +24,7 @@ const marketSchema = z.array(
     id: z.string().optional(),
     cd: z.string(),
     status: z.string(),
+    digits: z.string().optional(),
     price_decimals: z.string().optional(),
     volume_decimals: z.string().optional(),
   }),
@@ -67,9 +74,9 @@ export class RekuAdapter implements VenueAdapter {
 
   async discover(signal?: AbortSignal): Promise<VenueInstrument[]> {
     const raw = await fetchPublicJson(new URL('https://api.reku.id/v3/market'), HOSTS, signal);
-    const metadataVersion = 'reku-market-v3';
     return marketSchema.parse(raw).map((market) => {
       const asset = market.cd.toUpperCase();
+      const metadataVersion = `reku-market-v3+${REKU_CLIENT_RULE_VERSION}`;
       if (market.id) this.idByAsset.set(asset, market.id);
       return {
         venue: this.venue,
@@ -79,16 +86,10 @@ export class RekuAdapter implements VenueAdapter {
         quoteAsset: 'IDR',
         active: market.status === '1',
         directIdr: true,
-        marketPriceIncrementRule: decimalPlacesRule(
-          'price_decimals',
-          market.price_decimals,
-          metadataVersion,
-        ),
-        marketQuantityIncrementRule: decimalPlacesRule(
-          'volume_decimals',
-          market.volume_decimals,
-          metadataVersion,
-        ),
+        marketPriceIncrementRule: rekuPriceRule(market.digits, metadataVersion),
+        marketQuantityIncrementRule: rekuSellBaseRule(metadataVersion),
+        buyQuoteIncrementRule: rekuBuyQuoteRule(metadataVersion),
+        buyOutcomeIncrementRule: rekuBuyOutcomeRule(metadataVersion),
         metadataVersion,
       };
     });
@@ -112,6 +113,7 @@ export class RekuAdapter implements VenueAdapter {
       processedAt: nowIso(),
       freshnessIndependentlyVerified: false,
       synchronization: 'SNAPSHOT',
+      quantityLevelSemantics: 'DERIVED_FROM_NOTIONAL',
     });
   }
 
