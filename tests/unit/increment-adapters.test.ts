@@ -36,6 +36,7 @@ describe('venue-specific increment contracts', () => {
       sourceField: 'officialWebClient.sell.amount.scale',
       sourceSemantics: 'DECIMAL_PLACES',
       evidenceClass: 'OFFICIAL_WEB_CLIENT_OBSERVED',
+      contentSha256: 'f70980ea71240a3c9abeb080fb8707fd065714a24b8986a73fc04094634a943b',
     });
     expect(instrument.buyQuoteIncrementRule).toMatchObject({
       normalizedStep: '1',

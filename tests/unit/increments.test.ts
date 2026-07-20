@@ -97,4 +97,53 @@ describe('provenance-bearing increment rules', () => {
     book.bids[0].price = '1163000000.5';
     expect(() => validateBookIncrements(book, priceRule, quantityRule)).toThrow('misaligned_rules');
   });
+
+  it('keeps strict quantity alignment as the default for normal books', () => {
+    const book: CanonicalBook = {
+      schemaVersion: '1',
+      venue: 'INDODAX',
+      marketSegment: 'spot',
+      venueSymbol: 'btcidr',
+      canonicalInstrument: { baseAsset: 'BTC', quoteAsset: 'IDR' },
+      bids: [{ price: '999', quantity: '0.000000015' }],
+      asks: [{ price: '1000', quantity: '0.000000015' }],
+      receivedAt: new Date().toISOString(),
+      processedAt: new Date().toISOString(),
+      freshnessIndependentlyVerified: false,
+      synchronization: 'SNAPSHOT',
+    };
+
+    expect(() =>
+      validateBookIncrements(
+        book,
+        stepRule('tick', '1', metadataVersion),
+        stepRule('step', '0.00000001', metadataVersion),
+      ),
+    ).toThrow('misaligned_rules');
+  });
+
+  it('still fails closed on an unverified rule for derived aggregate books', () => {
+    const book: CanonicalBook = {
+      schemaVersion: '1',
+      venue: 'REKU',
+      marketSegment: 'spot',
+      venueSymbol: 'BTC_IDR',
+      canonicalInstrument: { baseAsset: 'BTC', quoteAsset: 'IDR' },
+      bids: [{ price: '999', quantity: '0.000000015' }],
+      asks: [{ price: '1000', quantity: '0.000000015' }],
+      receivedAt: new Date().toISOString(),
+      processedAt: new Date().toISOString(),
+      freshnessIndependentlyVerified: false,
+      synchronization: 'SNAPSHOT',
+      quantityLevelSemantics: 'DERIVED_FROM_NOTIONAL',
+    };
+
+    expect(() =>
+      validateBookIncrements(
+        book,
+        stepRule('tick', '1', metadataVersion),
+        unverifiedRule('missing', undefined, 'STEP_SIZE', metadataVersion),
+      ),
+    ).toThrow('unverified_rules');
+  });
 });

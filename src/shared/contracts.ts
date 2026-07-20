@@ -72,6 +72,7 @@ export type IncrementRule = {
   evidenceClass?: 'VENUE_API_DOCUMENTED' | 'OFFICIAL_WEB_CLIENT_OBSERVED';
   sourceUrl?: string;
   capturedAt?: string;
+  contentSha256?: string;
 };
 
 export type FeeAssumption = {

@@ -2,10 +2,10 @@
 
 ## Document status
 
-- Status: Accepted for WebSocket and period-aware Highcharts implementation
+- Status: Accepted for WebSocket, period-aware Highcharts, and side-aware execution rules
 - Owner: CTO
-- Last updated: 2026-07-18
-- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md); [ADR-002: Live market data and browser delivery](./adr/ADR-002-live-market-data-and-browser-delivery.md); [ADR-003: Markets read models and comparative chart](./adr/ADR-003-markets-read-models-and-comparative-chart.md)
+- Last updated: 2026-07-19
+- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md); [ADR-002: Live market data and browser delivery](./adr/ADR-002-live-market-data-and-browser-delivery.md); [ADR-003: Markets read models and comparative chart](./adr/ADR-003-markets-read-models-and-comparative-chart.md); [ADR-004: Side-aware execution rules and aggregate book semantics](./adr/ADR-004-side-aware-execution-rules-and-aggregate-book-semantics.md)
 
 ## Context and goals
 
@@ -241,9 +241,20 @@ VenueInstrument {
   status
   marketPriceIncrementRule
   marketQuantityIncrementRule
+  buyQuoteIncrementRule?
+  buyOutcomeIncrementRule?
   limitQuantityIncrementRule?
   minimumNotional
   metadataVersion
+}
+
+CanonicalBook {
+  bids
+  asks
+  quantityLevelSemantics?  // EXECUTABLE_INCREMENT | DERIVED_FROM_NOTIONAL
+  sourceEventAt?
+  receivedAt
+  processedAt
 }
 ```
 
@@ -283,6 +294,10 @@ IncrementRule {
   sourceSemantics       // STEP_SIZE | DECIMAL_PLACES | EXPLICITLY_DISABLED
   metadataVersion
   verifiedAt?
+  evidenceClass?         // VENUE_API_DOCUMENTED | OFFICIAL_WEB_CLIENT_OBSERVED
+  sourceUrl?
+  capturedAt?
+  contentSha256?
 }
 ```
 
@@ -294,13 +309,13 @@ The adapter must know the semantics of each source field from a venue-specific c
 - zero means `DISABLED` only where the venue contract explicitly defines zero as disabling the rule;
 - a missing, contradictory, non-positive, unparsable, or semantically ambiguous value is `UNVERIFIED`.
 
-The selected market quantity rule is allowed to fall back to another venue field, such as a general lot-size rule, only when that fallback is explicitly defined and tested for that venue and market segment. Reku and Indodax mappings therefore have independent contract fixtures for step-value versus decimal-count fields. Metadata heuristics are prohibited.
+The selected execution rule is allowed to fall back to another venue field, such as a general lot-size rule, only when that fallback is explicitly defined and tested for that venue, side, denomination, and market segment. A quote-denominated buy rule is not interchangeable with a base-denominated sell rule or a buy-outcome precision rule. Reku and Indodax mappings therefore have independent contract fixtures for their applicable semantics. Metadata heuristics are prohibited.
 
-Quantization uses exact decimal lattice operations. For a positive quantity `q` and verified step `s`, both buy and sell use `floor(q / s) * s`. This protects a buy budget from overspend and prevents a sell from exceeding the requested quantity or available holdings. The final executable quantity must have an exact zero remainder modulo `s`. Fees, taxes, weighted average price, and net proceeds are derived values and are not quantized to the order-size step.
+Quantization uses exact decimal lattice operations. For a positive input `q` and verified applicable step `s`, the service uses `floor(q / s) * s`. Base-denominated execution uses the base rule; quote-denominated execution uses the quote rule. A separate conservative outcome rule may floor a derived result without changing the consumed input or re-walking the book. The final quantized value must have an exact zero remainder modulo its applicable step. Fees, taxes, weighted average price, and net proceeds remain derived values.
 
 Market Lens does not construct a limit order, so it does not round book prices. If a future order-planning capability emits a protective limit price, it requires a separate execution contract; the safe default is to floor a buy limit price and ceil a sell limit price to the verified price step, with the adjustment disclosed before confirmation.
 
-If either required increment rule is `UNVERIFIED`, or if any active book level violates a verified rule, that venue/instrument is marked `UNVERIFIED_RULES`, excluded from winner selection, and suppressed from alerts. The service must not substitute a default precision or round malformed market data into validity.
+If any rule required for the requested side/denomination is `UNVERIFIED`, or if an active book level violates an applicable verified rule, that venue/instrument is marked `UNVERIFIED_RULES`, excluded from winner selection, and suppressed from alerts. Price alignment remains mandatory. Quantity modulo is mandatory only for books whose level quantities represent the executable lattice; `DERIVED_FROM_NOTIONAL` aggregate levels retain positive-decimal, ordering, crossed-book, and freshness validation without the inapplicable order-entry modulo check. The service must not substitute a default precision or round malformed market data into validity.
 
 The query API returns, at minimum:
 
@@ -326,6 +341,8 @@ VenueEstimate {
   levelsConsumed?
   priceIncrementRule
   quantityIncrementRule
+  inputIncrementRule?
+  inputDenomination?          // BASE | QUOTE
   ruleMetadataVersion
   quantityRoundingMode      // FLOOR for MVP
   sellReferencePrice?       // present when UI IDR input was converted to base
