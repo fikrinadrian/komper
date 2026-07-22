@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { decimalInputSchema, type CatalogInstrument, type Side } from '@shared/contracts.js';
 import { formatAsset, formatIdr } from '@client/lib/format.js';
+import { ArrowRightIcon, SignalIcon } from '@client/components/Icons.js';
 
 type Props = {
   instruments: CatalogInstrument[];
@@ -45,25 +46,26 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
   return (
     <form
       onSubmit={submit}
-      className="rounded-[1.75rem] bg-white p-5 shadow-panel ring-1 ring-ink/5 sm:p-7"
+      className="hud-panel-static p-5 sm:p-7"
       aria-labelledby="compare-heading"
     >
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-coral">
-            Pembanding spot IDR
-          </p>
-          <h2 id="compare-heading" className="text-2xl font-extrabold tracking-[-0.035em] text-ink">
+          <p className="eyebrow mb-1">Pembanding spot IDR</p>
+          <h2
+            id="compare-heading"
+            className="text-2xl font-extrabold tracking-[-0.035em] text-foreground"
+          >
             Rencanakan ukuran transaksimu
           </h2>
         </div>
-        <span className="hidden rounded-full bg-mint/10 px-3 py-1.5 text-xs font-bold text-emerald-800 sm:inline-flex">
-          ● Data publik
+        <span className="hidden items-center gap-2 rounded-sm border border-success/35 bg-success-soft px-3 py-1.5 text-xs font-bold text-success sm:inline-flex">
+          <SignalIcon className="h-4 w-4" /> Data publik
         </span>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <label className="grid gap-2 text-sm font-bold text-ink">
+        <label className="grid gap-2 text-sm font-bold text-foreground">
           Aset
           <select
             value={asset}
@@ -80,16 +82,16 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
         </label>
 
         <fieldset className="grid gap-2">
-          <legend className="text-sm font-bold text-ink">Arah transaksi</legend>
+          <legend className="text-sm font-bold text-foreground">Arah transaksi</legend>
           <div
-            className="grid grid-cols-2 rounded-xl bg-mist/70 p-1"
+            className="grid grid-cols-2 rounded-xl bg-surface-raised/70 p-1"
             role="radiogroup"
             aria-label="Arah transaksi"
           >
             {(['buy', 'sell'] as const).map((value) => (
               <label
                 key={value}
-                className={`cursor-pointer rounded-lg px-4 py-2.5 text-center text-sm font-extrabold transition ${side === value ? 'bg-white text-ink shadow-sm' : 'text-slate-500 hover:text-ink'}`}
+                className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md px-4 py-2.5 text-center text-sm font-extrabold transition-colors duration-ui has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-focus/30 ${side === value ? 'bg-primary-soft text-primary ring-1 ring-primary/35' : 'text-muted hover:bg-surface-soft hover:text-foreground'}`}
               >
                 <input
                   type="radio"
@@ -106,11 +108,11 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
         </fieldset>
       </div>
 
-      <label className="mt-5 grid gap-2 text-sm font-bold text-ink" htmlFor="trade-size">
+      <label className="mt-5 grid gap-2 text-sm font-bold text-foreground" htmlFor="trade-size">
         {side === 'buy' ? 'Budget pembelian' : 'Jumlah aset yang dijual'}
         <span className="relative">
           {side === 'buy' && (
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-extrabold text-slate-500">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-extrabold text-muted">
               Rp
             </span>
           )}
@@ -125,14 +127,14 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
             aria-invalid={Boolean(error)}
           />
           {side === 'sell' && (
-            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-extrabold text-slate-500">
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-extrabold text-muted">
               {asset}
             </span>
           )}
         </span>
       </label>
       <div className="mt-2 flex min-h-6 flex-wrap items-center justify-between gap-2 text-xs">
-        <span id="size-preview" className="text-slate-500">
+        <span id="size-preview" className="text-muted">
           {decimalInputSchema.safeParse(amount).success
             ? `Dibaca sebagai ${
                 side === 'buy'
@@ -141,7 +143,7 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
               }`
             : 'Masukkan angka tanpa pemisah ribuan.'}
         </span>
-        <span id="size-error" role="alert" className="font-bold text-red-700">
+        <span id="size-error" role="alert" className="font-bold text-danger">
           {error}
         </span>
       </div>
@@ -152,7 +154,7 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
             key={preset}
             type="button"
             onClick={() => setAmount(preset)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-coral hover:text-ink focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25"
+            className="min-h-11 rounded-md border border-border bg-surface-soft px-3 py-2 text-xs font-bold text-muted transition-colors duration-ui hover:border-primary hover:text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25"
           >
             {side === 'buy' ? formatIdr(preset, true) : formatAsset(preset, asset)}
           </button>
@@ -162,9 +164,10 @@ export function ComparisonForm({ instruments, initialAsset = 'BTC', pending, onS
       <button
         type="submit"
         disabled={pending || !selectable.length}
-        className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-coral px-5 py-3.5 text-base font-extrabold text-white shadow-lg shadow-coral/20 transition hover:-translate-y-0.5 hover:bg-[#f35f49] focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/35 disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
+        className="action-primary mt-6 min-h-12 w-full text-base disabled:cursor-wait"
       >
-        {pending ? 'Mengambil snapshot…' : 'Bandingkan estimasi'} <span aria-hidden="true">→</span>
+        {pending ? 'Mengambil snapshot…' : 'Bandingkan estimasi'}
+        <ArrowRightIcon className="h-5 w-5" />
       </button>
     </form>
   );

@@ -6,14 +6,16 @@
 - QA owner: `senior_qa_engineer`
 - Product owner: `product_manager`
 - Technical owner: `cto`
-- Last updated: 2026-07-18
-- Related documents: [Market Lens PRD](../product/market-lens-prd.md), [architecture](../architecture/market-lens-architecture.md), [ADR-001](../architecture/adr/ADR-001-market-data-ingestion-and-normalization.md), [ADR-002](../architecture/adr/ADR-002-live-market-data-and-browser-delivery.md), and [ADR-003](../architecture/adr/ADR-003-markets-read-models-and-comparative-chart.md)
+- Last updated: 2026-07-21
+- Related documents: [Market Lens PRD](../product/market-lens-prd.md), [architecture](../architecture/market-lens-architecture.md), [ADR-001](../architecture/adr/ADR-001-market-data-ingestion-and-normalization.md), [ADR-002](../architecture/adr/ADR-002-live-market-data-and-browser-delivery.md), [ADR-003](../architecture/adr/ADR-003-markets-read-models-and-comparative-chart.md), [ADR-005](../architecture/adr/ADR-005-token-driven-cyberpunk-presentation.md), and [cyberpunk design-system master](../../design-system/market-lens/MASTER.md)
 
 ## Quality objectives
 
 Testing protects the decision a user makes from a comparison. A venue must never win because of wrong side selection, binary floating-point conversion, stale or invalid data, unsupported market state, insufficient depth, or an unverified fee. The UI must explain why a result is or is not eligible, preserve exact financial values through display, work without exchange credentials, and remain usable by keyboard at narrow/reflowed layouts.
 
 The strategy distinguishes deterministic correctness evidence from point-in-time upstream contract evidence. Live public API checks do not prove reliability, data rights, freshness, or a service-level objective.
+
+The all-page cyberpunk rework is a presentation change, not permission to weaken financial hierarchy, semantics, recovery, or data-health disclosure. Its release evidence must prove that every route and material state uses the approved token system consistently while remaining readable, operable, and understandable without neon color, glow, animation, hover, or visual chart inspection.
 
 ## Scope
 
@@ -28,6 +30,7 @@ The strategy distinguishes deterministic correctness evidence from point-in-time
 - Market discovery at `/markets` and pair detail at `/markets/{pair}`, including direct navigation, browser history, same-pair last-price comparison, price/depth/trade panels, and one Highcharts line chart that overlays OHLC-close history for the three venues.
 - Chart timeframe selection for `1D`, `1W`, `1Y`, and `All`, including allowlisted API query validation, server-declared interval/bounds, loading and race behavior, bounded all-time responses, and state preservation during refresh.
 - Aggregate detail loading/retry plus independent empty, partial, stale, schema-error, and recovery status for ticker, order book, recent trades, and OHLC components inside the snapshot.
+- Cyberpunk visual-system adoption across `/`, `/markets`, `/markets/{pair}`, malformed/unsupported route states, and their loading, success, empty, partial, validation, error, disabled, focus, and recovery states.
 
 ### Out of scope
 
@@ -61,6 +64,11 @@ The strategy distinguishes deterministic correctness evidence from point-in-time
 | Rate limit, timeout, or retry storm | High | Medium | Mock 429/`Retry-After`, abort/timeout, call-count and circuit-state tests |
 | Credentials/private capability enters MVP | Critical | Low | Route/source inventory, network observation, allowlist tests |
 | Inaccessible state or mobile data loss | High | Medium | Playwright keyboard, 320 px overflow, 200% reflow equivalent, reduced motion |
+| Neon-on-dark colors, glow, scanlines, or transparency reduce text, focus, border, or chart contrast | High | High | Token-pair contrast audit, automated accessibility scan, manual contrast review, focused component probes |
+| Cyberpunk decoration obscures financial hierarchy, units, freshness, or unhealthy-data status | Critical | Medium | Deterministic healthy/partial/stale/no-winner fixtures, non-color assertions, desktop/mobile visual review |
+| Theme is applied unevenly across routes or non-happy states | High | High | Route/state screenshot matrix plus computed token and typography checks |
+| Dense HUD styling clips tables, labels, price digits, or actions at reflow widths | High | High | Pixel 5, 320/375 px, landscape, 200% zoom-equivalent reflow, long-decimal/long-reason fixtures |
+| Glitch, scanline, glow, hover, or route animation causes motion sensitivity, jank, focus loss, or layout shift | High | Medium | Reduced-motion project, keyboard navigation during transitions, layout-shift and overflow observation |
 | Commercial use without venue permission | Critical | High until resolved | Documentary release gate owned by product/legal |
 | Snapshot/delta semantics are confused across venues | Critical | High | Capability-specific state builders and protocol replay; never infer delta semantics |
 | Gap, reorder, duplicate, or old-epoch event corrupts a plausible book | Critical | High | Sequence/offset/epoch invariant tests and immediate fail-closed invalidation |
@@ -109,12 +117,25 @@ The strategy distinguishes deterministic correctness evidence from point-in-time
 | AC-27 timeframe/state | Period enum, frozen-clock bounds, selection/query state, stale-result suppression | `period=1d|1w|1y|all`, server-declared interval and bounded point count | Period/interval/start/end metadata; deterministic downsampling policy | Four controls, default `1d`, rapid switching, refresh/error/focus/visibility | Announcement, reduced-motion, touch target review | Selected period, visible lines, and focus survive refresh; old responses never replace the active period |
 | AC-28 aggregate retry/component recovery | Explicit ticker/book/trades/candles state aggregation | One component/venue fails then fresh aggregate recovery | Component status/reason bounded/non-sensitive | One whole-snapshot retry; healthy prior data retained | Stable live-region announcement | Component states recover without full-page reload |
 | AC-29 responsive/accessibility | Component semantics where useful | — | — | Desktop, Pixel 5, 320 px, 200% zoom, keyboard | Screen reader and contrast follow-up | No critical loss, trap, or page overflow |
+| AC-34 all-route visual coverage | Token-name/static-style checks where useful | — | — | Computed root/component style smoke on every route | Approved route screenshot review | No unapproved legacy presentation; one coherent semantic theme |
+| AC-35 state-complete visual coverage | Semantic status presentation checks | — | — | Loading/empty/success/disabled/validation/partial/stale/reconnecting/unavailable/retry/recovered states | State hierarchy and affordance review | Every material state is themed, textual, and recoverable where applicable |
+| AC-36 behavioral and semantic parity | Existing component/domain behavior remains green | Existing APIs and analytics meaning unchanged | Existing schemas unchanged | Comparison, discovery, detail, invalid/unsupported, retry, timeframe, history, and external-link journeys | Reading/focus order and disclosure review | No functional, semantic, financial, analytics, or recovery regression |
+| AC-37 contrast and non-color meaning | Token-pair contrast checks | — | — | Focus, status text/icon, selected/disabled/error state assertions | WCAG contrast plus chart/gradient/glow/grayscale review | Text, UI, focus, and data remain perceivable without color or glow |
+| AC-38 keyboard, touch, and zoom | Native/control semantics where useful | — | — | Full tab journeys, 44 px target probes, 375 px and 200% zoom | Reading/tab order and pointer/hover independence | No trap, obscured/lost focus, hidden ring, or undersized primary target |
+| AC-39 responsive data density | — | — | — | 320, 375, Pixel 5, 768, 1024, 1440 px; landscape | Visual clipping/overlap/measure review | No page overflow or loss of identity, units, status, action, or table access |
+| AC-40 purposeful and reduced motion | Motion-token/static-style checks | — | — | Default and reduced-motion journeys during load/navigation/update | Vestibular and distraction review | 150–300 ms purposeful motion; reduced motion removes non-essential movement |
+| AC-41 readable financial data | Formatting and alignment regressions remain green | Exact numeric strings unchanged | Existing decimal schemas unchanged | Long-value, label/unit, fee, slippage, freshness, table/card probes | Typography, glow, texture, truncation, and line-height review | No ambiguous digit, detached unit, or hidden material qualifier |
+| AC-42 chart theme integrity | Series identity and exact-value tests remain green | Candle/detail contracts unchanged | Existing OHLC schema unchanged | Healthy/partial/gapped/unavailable chart and accessible data equivalent | Dark-surface contrast and non-color venue review | AC-25–AC-33 semantics remain intact in both motion modes |
+| AC-43 visual stability and performance | Asset dimension and theme-boundary checks | — | — | Layout-shift observation during cold/warm load and period change | Production bundle plus LCP/CLS/INP evidence | Targets pass or documented product/CTO exception blocks release |
+| AC-44 analytics continuity and visual feedback | Event mapping and privacy checks | Analytics endpoint contract unchanged | Bounded structured feedback schema if adopted | Same critical actions emit once before/after rework | Consent, minimization, and copy review | No duplicate/change to existing meaning or new sensitive aesthetic telemetry |
 
 ## Frontend test approach
 
 Playwright runs desktop Chromium and Pixel 5 against the production build with fixture data. Critical browser tests cover 3/3 buy, 2/3 partial availability, insufficient depth, mobile keyboard sell, and the Highcharts comparison across all four periods. Targeted release checks additionally use 320 px reflow, reduced motion, horizontal-overflow detection, external-link focus, request inventory, delayed period responses, and a simulated fail-then-recover response that must retain user input and chart controls.
 
 Before public beta, add persistent automated coverage for stale, all unavailable, no winner, fee verified/expired, schema error, empty book, recovery announcement, 200% browser zoom, and an automated accessibility scanner. Web-first assertions and user-facing roles/names are required; arbitrary sleeps and implementation selectors are prohibited.
+
+For the cyberpunk rework, add deterministic `toHaveScreenshot` coverage rather than replacing behavioral assertions with pixels. Use fixed fixture data, frozen or masked volatile timestamps, disabled animations for capture, explicit viewports, and committed reviewed baselines. Full-page baselines cover the three primary surfaces at desktop and phone widths; targeted component/state baselines cover form validation, comparison healthy/partial/no-winner, Markets empty/error, detail partial/timeframe-error, and malformed/unsupported routes. Screenshot diffs are reviewed alongside semantic assertions because pixel similarity cannot prove contrast, focus order, accessible names, or correct financial values.
 
 ## API and contract test approach
 
@@ -150,12 +171,51 @@ Fixture mode is the deterministic release oracle. It contains no user data, cred
 | Markets route correctness | AC-17–AC-29 deterministic/API/browser suites, including every `period` value and invalid-query fan-out checks | 100% pass; no open P0/P1; every unsupported or unhealthy capability fails closed |
 | Markets chart correctness | Highcharts series-point oracle, timeframe boundary matrix, gap/partial fixtures, and delayed-response E2E | Every point equals canonical OHLC `close`; three stable venue identities; no interpolation, cross-period leak, or unbounded `all` payload |
 | Markets accessibility | Automated accessibility scan plus keyboard/reflow/timeframe/chart-data-alternative evidence | Zero critical/serious violations; all information available without pointer, color, animation, tooltip hover, or visual chart inspection |
+| Cyberpunk theme consistency | AC-34–AC-44 route/state screenshots, computed token smoke, contrast scan, keyboard/touch/zoom/reflow/reduced-motion, analytics, and performance evidence | All planned surfaces/states evidenced; zero unexplained baseline diff; no critical/serious accessibility issue; performance targets met or blocked by owner exception; no open P0/P1/P2 theme regression |
 
 ## Defect management and exit criteria
 
 P0 can cause loss, credential exposure, or active harmful execution; P1 can recommend the wrong/ineligible venue or materially misstate a financial value; P2 misleads state/diagnosis or breaks an important secondary path; P3 is minor. Every defect records deterministic repro, observed/expected result, affected AC, and retest evidence. P0/P1 defects cannot receive a QA release exception for public beta.
 
 Internal evaluation may proceed with visible internal labeling, public data only, and no external monetization. Public beta requires all P0/P1 defects closed, every AC observed or explicitly accepted by its owner, legal approval, and the 72-hour shadow evidence. Public reliability claims additionally require the 30-day evidence and an approved SLO.
+
+## Cyberpunk all-page theme QA plan
+
+The PRD and ADR-005 are authoritative for acceptance and technical constraints; the design-system master is a visual input. QA verifies the rendered experience rather than requiring a particular class name or DOM structure. The current Playwright configuration has only Chromium desktop and Pixel 5 projects, captures screenshots only on failure, and does not include an automated accessibility scanner. Therefore visual baselines, a reduced-motion project/check, scanner evidence, performance evidence, and any additional browser-engine support remain planned until implemented and observed. Product and CTO must explicitly confirm the supported browser matrix; Chromium-only results must not be reported as cross-browser approval.
+
+### Testable acceptance
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| AC-34 | The approved cyberpunk requirements, semantic tokens, and any explicitly approved page override | A user loads `/`, `/markets`, a supported detail route, a malformed route, or an unsupported pair | The shared shell and every visible surface resolve through the approved semantic system. A reviewed computed-style/token smoke and route screenshot show no unapproved legacy cream/white/coral treatment, while semantic exceptions remain documented and contrast-safe. |
+| AC-35 | Deterministic loading, empty, success, disabled, validation, partial, stale, reconnecting, unavailable, retry, and recovered fixtures | Each affected shared or route component renders | Every state remains recognizably themed, identifies scope and status in visible/accessibility text, preserves prior healthy content where required, and exposes the same recovery action. The evidence matrix records a behavioral assertion and either targeted screenshot or reviewed manual capture for every listed state. |
+| AC-36 | The existing deterministic comparison, Markets, detail, routing, and API fixtures | A user completes comparison, search, canonical navigation, timeframe/series selection, accessible chart inspection, retry, external navigation, and browser history | Inputs/defaults, accessible roles/states, URLs, requests, exact values, venue order, disclosures, winner eligibility, analytics meaning, and recovery behavior remain unchanged. Decorative wrappers do not intercept input or alter reading/focus order. |
+| AC-37 | Approved dark-surface token pairs plus healthy, warning, stale, unavailable, schema-error, winner, focus, selected, and disabled states | Each state renders over its actual solid, gradient, translucent, glowing, textured, and chart backgrounds | Normal text measures at least 4.5:1; large text and essential graphical/UI boundaries at least 3:1; focus indicators at least 3:1 against adjacent colors. Status and selection retain text, symbol, shape, pattern, or semantics in addition to hue; glow and text shadow are excluded from contrast calculations. |
+| AC-38 | Keyboard-only input, 375 CSS px touch viewport, and 200% zoom | A user traverses header/navigation, comparison controls, submit/retry actions, pair links, timeframe/series controls, chart data, tables, and external links | Tab order follows reading order, focus stays visible and unobscured through updates/navigation, activation works without hover, icon-only controls are named, primary hit areas measure at least 44 by 44 CSS px, and adjacent targets have at least 8 CSS px separation where required. |
+| AC-39 | Long Indonesian labels/reasons, high-precision values, all venues, and expanded data tables | Routes render at 320, 375, Pixel 5, 768, 1024, and 1440 CSS px plus phone landscape | The document has no unintended horizontal overflow. Pair/venue identity, numbers, units, freshness/status, headings, controls, and recovery actions neither overlap nor become clipped or unreachable. Deliberately scrollable tables are labeled, keyboard reachable, visibly signposted, and do not trap page scrolling. |
+| AC-40 | Default motion and `prefers-reduced-motion: reduce` | Loading, navigation, hover/focus, timeframe changes, result arrival, live status, and decorative effects occur | Purposeful default transitions normally complete within 150–300 ms, remain interruptible, use transform/opacity where practical, and do not block input or shift layout. Reduced motion disables non-essential glow pulses, reveals, scans, parallax, smooth scrolling, pulsing, and chart entrance animation while preserving immediate state feedback. |
+| AC-41 | Worst-case prices, quantities, timestamps, fees, slippage, freshness labels, and material qualifiers | The cyberpunk typography, glow, texture, cards, and tables render at phone and desktop widths | Compared numerals remain tabular or consistently aligned, units/labels stay attached, body text is at least 16 CSS px on mobile with at least 1.5 line height, and no effect obscures a glyph. Any truncation exposes the full material value accessibly. |
+| AC-42 | Healthy, complete, partial, gapped, and unavailable chart fixtures in ordinary and reduced-motion modes | The themed Highcharts surface and accessible data equivalent render and controls are used | Plot, axes, grid, legend, focus/selection, tooltip/data equivalent, period, gaps, and reasons remain distinguishable on dark surfaces. Venue identity has a non-color distinction, chart animation remains disabled where required, and all AC-25–AC-33 exact-value and state semantics remain green. |
+| AC-43 | A named production build on approved mobile and desktop profiles with cold/warm cache states | `/`, `/markets`, detail, and a chart period change are measured | Decorative assets reserve space or do not participate in layout; no theme effect introduces layout shift or delays primary data/action. Report observed LCP, CLS, and INP or the closest reproducible lab evidence against the PRD targets, bundle/chunk change, font/asset origins, and any product/CTO blocking exception. |
+| AC-44 | A mapped critical action set before and after the rework | Comparison, navigation, retry, chart selection, and external-link actions occur once | Existing events fire once with the same bounded non-sensitive meaning. No order intent, theme preference, pointer trail, or free-text aesthetics are newly collected; if `visual_rework_feedback` is implemented, its structured fields, consent behavior, and schema match the PRD exactly. |
+
+### Route and state evidence matrix
+
+| Surface | Required deterministic states | Desktop evidence | Phone/reflow evidence | Interaction/accessibility evidence |
+| --- | --- | --- | --- | --- |
+| `/` comparison | Initial, validation error, loading, 3/3 result, 2/3 partial, insufficient depth, no winner/API error, recovery | Full-page initial and 3/3; focused state captures for the others | 393 px primary journey; targeted 320/375 px long-value and result cards | Keyboard buy/sell, focus retention, live result/error announcement, contrast/status scan |
+| `/markets` discovery | Loading, populated, filtered result, search empty, stale/unavailable cells, API error/retry | Full-page populated; targeted empty/error table regions | 393 px full page; 320 px table/card overflow probe; phone landscape search/navigation | Search label/focus, pair-link target size, table semantics, non-color freshness/support states |
+| `/markets/{pair}` detail | Loading, healthy, partial component, all unavailable, timeframe loading/error with retained chart, recovery | Full-page healthy plus targeted chart, book, trade, OHLC, partial/error regions | 393 px full journey; 320/375 px expanded chart data and widest tables; 200% reflow | Breadcrumb/history, timeframe and venue keyboard controls, focus persistence, accessible chart equivalent |
+| Invalid and unsupported market routes | Malformed route and well-formed pair outside catalog | Targeted full-state captures | 393/320 px recovery-link checks | Distinct heading/alert meaning, no detail fan-out, recovery link focus and target size |
+
+### Planned evidence and release interpretation
+
+- Keep functional tests in both existing Playwright projects. Restrict stable screenshot baselines to a named Chromium visual project with fixed viewport, locale, color scheme, font availability, animation suppression, fixture mode, and volatile timestamp masking; this prevents device-emulation and font-rendering noise from being hidden with broad thresholds.
+- Add an explicit reduced-motion context for at least the comparison submit/result flow and detail timeframe/chart flow. Assert computed animation/transition behavior only for user-relevant theme effects; do not couple tests to generated Tailwind class names.
+- Add an automated accessibility scan after each primary route reaches a deterministic stable state and after representative validation, partial, and unsupported states. Scanner output complements manual keyboard, reading order, focus visibility, zoom, contrast over gradients, and chart interpretation checks.
+- Capture before/after reference images only from known builds. The quality report names commit/build, fixture mode, browser/project, OS/font environment, viewport, state/fixture, command, baseline approval, diff result, and artifact path. Existing `docs/quality/artifacts/*.png` files are historical evidence, not automatic approval of the new theme.
+- Treat missing or inconsistent cyberpunk styling as P2 when it materially breaks the requested all-page experience, P1 when it hides or misstates financial/status information or blocks a critical journey, and P3 only for isolated polish with no usability or consistency impact.
+- Do not claim release readiness from the present suite alone: it has behavioral coverage but no theme baselines, no automated scanner dependency, no dedicated reduced-motion project, and no confirmed Firefox/WebKit support decision.
 
 ## Markets discovery and detail QA plan
 

@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@fontsource/jetbrains-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/orbitron':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@highcharts/react':
         specifier: ^5.2.2
         version: 5.2.2(@types/react@19.2.17)(highcharts@13.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -728,6 +734,12 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource/jetbrains-mono@5.3.0':
+    resolution: {integrity: sha512-fqDfB5I9f1p1TV486aUgB9t8zP84P0O1FtQR5Ol9vjwPy+S+EIGlVYm1cvj2W5shcZMTg2nZFdVMoH5wFu8a1A==}
+
+  '@fontsource/orbitron@5.3.0':
+    resolution: {integrity: sha512-+BhPsbUAo/AF7sRcf+TEexm+EWWkgTiR9Zwb7AhYIPkc5oplfvw0C45Oc2xlKPhwVEmxG8hHuA6/Ansbl+Bc6w==}
 
   '@highcharts/react@5.2.2':
     resolution: {integrity: sha512-yeJt37+yrReKip4nxKmjhkYX8c+wZBYy/p0TtUw4ZIUApGc66zjP6jTQw3NnenMrsPKgtsv791pqlvN9qT62aQ==}
@@ -2976,6 +2988,10 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource/jetbrains-mono@5.3.0': {}
+
+  '@fontsource/orbitron@5.3.0': {}
 
   '@highcharts/react@5.2.2(@types/react@19.2.17)(highcharts@13.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:

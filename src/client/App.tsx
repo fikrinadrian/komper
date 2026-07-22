@@ -13,6 +13,7 @@ import { ComparisonForm } from '@client/components/ComparisonForm.js';
 import { Logo } from '@client/components/Logo.js';
 import { Results } from '@client/components/Results.js';
 import { MarketDetailPage, MarketsPage } from '@client/components/MarketPages.js';
+import { SignalIcon } from '@client/components/Icons.js';
 
 type Submitted = { asset: string; side: Side; amount: string };
 
@@ -86,76 +87,72 @@ function LandingPage() {
   const initialAsset =
     requestedAsset && /^[A-Z0-9]{2,12}$/.test(requestedAsset) ? requestedAsset : 'BTC';
   return (
-    <div id="top" className="min-h-screen bg-cream text-ink">
-      <header className="relative overflow-hidden bg-navy text-white">
-        <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-coral/10 blur-3xl" />
+    <div id="top" className="app-shell">
+      <header className="hud-header">
         <nav
           className="relative mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8"
           aria-label="Navigasi utama"
         >
           <Logo />
-          <div className="flex items-center gap-5 text-sm font-bold text-white/75">
+          <div className="flex items-center gap-2 text-sm font-bold text-muted sm:gap-3">
             <a
               href="/markets"
-              className="rounded-md hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40"
+              className="inline-flex min-h-11 items-center rounded-md px-3 hover:bg-foreground/5 hover:text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/40"
             >
               Markets
             </a>
             <a
               href="#methodology"
-              className="hidden rounded-md hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40 sm:inline"
+              className="hidden min-h-11 items-center rounded-md px-3 hover:bg-foreground/5 hover:text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/40 sm:inline-flex"
             >
               Metodologi
             </a>
-            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/85">
+            <span className="hidden rounded-sm border border-accent/35 bg-accent-soft px-3 py-1.5 font-data text-xs uppercase tracking-wider text-accent md:inline-flex">
               Evaluasi internal
             </span>
           </div>
         </nav>
         <div className="relative mx-auto grid max-w-7xl gap-10 px-5 pb-20 pt-12 sm:px-8 lg:grid-cols-[1.04fr_.96fr] lg:items-center lg:pb-24 lg:pt-16">
           <div>
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.15em] text-[#8ff1dc]">
-              <span aria-hidden="true">◎</span> Indodax · Reku · Tokocrypto
+            <p className="eyebrow mb-5 inline-flex items-center gap-2 rounded-sm border border-success/40 bg-success-soft px-3 py-1.5 text-success">
+              <SignalIcon className="h-4 w-4" /> Indodax · Reku · Tokocrypto
             </p>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.03] tracking-[-0.055em] sm:text-5xl lg:text-[4.25rem]">
-              Harga terbaik bukan selalu <span className="text-coral">harga terakhir.</span>
+            <h1 className="max-w-3xl font-display text-4xl font-bold leading-[1.08] tracking-[-0.035em] sm:text-5xl lg:text-[4rem]">
+              Harga terbaik bukan selalu <span className="text-primary">harga terakhir.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-7 text-muted sm:text-lg">
               Bandingkan estimasi hasil spot IDR berdasarkan beberapa level order book—beserta
               slippage, kedalaman, dan kondisi datanya.
             </p>
-            <div className="mt-8 grid max-w-lg grid-cols-3 gap-3 border-t border-white/10 pt-6 text-sm">
+            <div className="mt-8 grid max-w-lg grid-cols-3 gap-3 border-t border-foreground/10 pt-6 text-sm">
               <div>
-                <strong className="block text-xl text-white">3</strong>
-                <span className="text-slate-400">exchange bernama</span>
+                <strong className="block font-data text-xl text-foreground tabular-nums">3</strong>
+                <span className="text-muted">exchange bernama</span>
               </div>
               <div>
-                <strong className="block text-xl text-white">IDR</strong>
-                <span className="text-slate-400">pair langsung saja</span>
+                <strong className="block font-data text-xl text-foreground">IDR</strong>
+                <span className="text-muted">pair langsung saja</span>
               </div>
               <div>
-                <strong className="block text-xl text-white">0</strong>
-                <span className="text-slate-400">kredensial diminta</span>
+                <strong className="block font-data text-xl text-foreground tabular-nums">0</strong>
+                <span className="text-muted">kredensial diminta</span>
               </div>
             </div>
           </div>
           <div className="lg:translate-y-10">
             {catalog.isPending && (
-              <div className="rounded-[1.75rem] bg-white p-7 text-ink shadow-panel" role="status">
-                <div className="h-5 w-32 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" />
-                <div className="mt-7 h-12 animate-pulse rounded-xl bg-slate-100 motion-reduce:animate-none" />
-                <div className="mt-5 h-12 animate-pulse rounded-xl bg-slate-100 motion-reduce:animate-none" />
-                <p className="mt-5 text-sm text-slate-500">Memvalidasi katalog pair publik…</p>
+              <div className="hud-panel-static p-7 text-foreground" role="status">
+                <div className="h-5 w-32 animate-pulse rounded bg-surface-raised motion-reduce:animate-none" />
+                <div className="mt-7 h-12 animate-pulse rounded-xl bg-surface-raised motion-reduce:animate-none" />
+                <div className="mt-5 h-12 animate-pulse rounded-xl bg-surface-raised motion-reduce:animate-none" />
+                <p className="mt-5 text-sm text-muted">Memvalidasi katalog pair publik…</p>
               </div>
             )}
             {catalog.isError && (
-              <div className="rounded-[1.75rem] bg-white p-7 text-ink shadow-panel" role="alert">
+              <div className="hud-panel-static state-danger p-7 text-foreground" role="alert">
                 <h2 className="text-xl font-extrabold">Katalog belum tersedia</h2>
-                <p className="mt-2 text-sm text-slate-600">{catalog.error.message}</p>
-                <button
-                  onClick={() => void catalog.refetch()}
-                  className="mt-5 rounded-xl bg-coral px-5 py-3 font-bold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/30"
-                >
+                <p className="mt-2 text-sm text-muted">{catalog.error.message}</p>
+                <button onClick={() => void catalog.refetch()} className="action-primary mt-5">
                   Coba lagi
                 </button>
               </div>
@@ -174,38 +171,29 @@ function LandingPage() {
 
       <main className="mx-auto max-w-7xl px-5 pb-20 pt-10 sm:px-8 lg:pt-20">
         {sourceProblems.length > 0 && (
-          <div
-            role="status"
-            className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-          >
+          <div role="status" className="state-warning mb-5 rounded-md p-4 text-sm">
             Sebagian metadata venue tidak tersedia:{' '}
             {sourceProblems.map((item) => item.venue).join(', ')}. Pair hanya ditampilkan bila
             cakupan tiga venue tervalidasi.
           </div>
         )}
         {comparison.isFetching && submitted && !comparison.data && (
-          <div
-            className="rounded-2xl border border-slate-200 bg-white p-8 text-center"
-            role="status"
-          >
+          <div className="hud-panel-static p-8 text-center" role="status">
             Mengambil tiga snapshot order book dan memeriksa kesehatannya…
           </div>
         )}
         {comparison.isError && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5" role="alert">
-            <h2 className="font-extrabold text-red-900">Perbandingan gagal dimuat</h2>
-            <p className="mt-1 text-sm text-red-800">{comparison.error.message}</p>
-            <button
-              onClick={() => void comparison.refetch()}
-              className="mt-4 rounded-lg bg-red-800 px-4 py-2 text-sm font-bold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
-            >
+          <div className="state-danger rounded-md p-5" role="alert">
+            <h2 className="font-extrabold text-danger">Perbandingan gagal dimuat</h2>
+            <p className="mt-1 text-sm text-danger">{comparison.error.message}</p>
+            <button onClick={() => void comparison.refetch()} className="action-danger mt-4">
               Coba lagi tanpa menghapus input
             </button>
           </div>
         )}
         {comparison.data && <Results comparison={comparison.data} />}
         {submitted && liveEnabled && (
-          <p className="mt-3 text-sm text-slate-600" role="status" aria-live="polite">
+          <p className="mt-3 text-sm text-muted" role="status" aria-live="polite">
             {liveState === 'live'
               ? 'Pembaruan live tersambung.'
               : liveState === 'reconnecting'
@@ -214,11 +202,11 @@ function LandingPage() {
           </p>
         )}
         {!submitted && catalog.data && (
-          <section className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
+          <section className="hud-panel-static border-dashed bg-surface/60 p-8 text-center">
             <p className="text-lg font-extrabold">
               Siap membandingkan ukuran nyata, bukan hanya ticker.
             </p>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-muted">
               Pilih aset, arah, dan ukuran di atas untuk melihat estimasi per venue.
             </p>
           </section>
@@ -226,10 +214,10 @@ function LandingPage() {
 
         <section
           id="methodology"
-          className="mt-16 grid gap-8 border-t border-slate-200 pt-12 lg:grid-cols-[.7fr_1.3fr]"
+          className="mt-16 grid gap-8 border-t border-border pt-12 lg:grid-cols-[.7fr_1.3fr]"
         >
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-coral">Cara kerja</p>
+            <p className="eyebrow">Cara kerja</p>
             <h2 className="mt-2 text-3xl font-black tracking-[-0.045em]">
               Transparan sampai ke asumsi.
             </h2>
@@ -252,25 +240,25 @@ function LandingPage() {
                 'Data stale, crossed, invalid, atau tidak cukup tidak boleh menentukan pemenang.',
               ],
             ].map(([number, title, copy]) => (
-              <article key={number} className="rounded-2xl bg-white p-5 ring-1 ring-slate-200">
-                <span className="text-xs font-black text-coral">{number}</span>
+              <article key={number} className="hud-panel p-5">
+                <span className="font-data text-xs font-semibold text-accent">SYS_{number}</span>
                 <h3 className="mt-3 font-extrabold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
+                <p className="mt-2 text-sm leading-6 text-muted">{copy}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <details className="mt-10 rounded-2xl border border-slate-200 bg-white p-5 open:shadow-sm">
-          <summary className="cursor-pointer font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25">
+        <details className="hud-panel-static mt-10 p-5 open:shadow-glow">
+          <summary className="flex min-h-11 cursor-pointer items-center font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25">
             Cakupan dan batasan exchange
           </summary>
-          <div className="mt-4 grid gap-5 text-sm leading-6 text-slate-600 sm:grid-cols-2">
+          <div className="mt-4 grid gap-5 text-sm leading-6 text-muted sm:grid-cols-2">
             <p>
               Market Lens saat ini hanya membandingkan{' '}
-              <strong className="text-ink">Indodax, Reku, dan Tokocrypto</strong>. Ini bukan cakupan
-              semua exchange Indonesia. Katalog dihitung dari metadata pair IDR aktif yang tersedia
-              di ketiganya.
+              <strong className="text-foreground">Indodax, Reku, dan Tokocrypto</strong>. Ini bukan
+              cakupan semua exchange Indonesia. Katalog dihitung dari metadata pair IDR aktif yang
+              tersedia di ketiganya.
             </p>
             <p>
               Produk tidak meminta API key, tidak mengetahui saldo, dan tidak mengeksekusi order.
@@ -280,8 +268,8 @@ function LandingPage() {
           </div>
         </details>
       </main>
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <footer className="border-t border-border/70 bg-surface-strong">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span>Komper Market Lens · Estimasi observasional</span>
           <span>Waktu ditampilkan dalam WIB · Data publik saja</span>
         </div>
@@ -322,17 +310,14 @@ function currentRoute(): { page: 'landing' | 'markets' | 'detail' | 'not-found';
 
 function NotFoundPage() {
   return (
-    <div className="grid min-h-screen place-items-center bg-cream px-5 text-ink">
-      <main className="max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-panel">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-coral">404 · Not found</p>
+    <div className="app-shell grid place-items-center px-5">
+      <main className="hud-panel-static w-full max-w-lg p-8 text-center">
+        <p className="eyebrow">SYS_404 · Not found</p>
         <h1 className="mt-3 text-3xl font-black tracking-[-0.04em]">Route market tidak valid</h1>
-        <p className="mt-3 leading-7 text-slate-600">
+        <p className="mt-3 leading-7 text-muted">
           Gunakan pair spot IDR dalam format seperti <span className="font-bold">btc-idr</span>.
         </p>
-        <a
-          href="/markets"
-          className="mt-6 inline-flex rounded-xl bg-navy px-5 py-3 text-sm font-extrabold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/30"
-        >
+        <a href="/markets" className="action-primary mt-6">
           Kembali ke Markets
         </a>
       </main>

@@ -2,16 +2,18 @@
 
 ## Document status
 
-- Status: Accepted for WebSocket, period-aware Highcharts, and side-aware execution rules
+- Status: Accepted for WebSocket, period-aware Highcharts, side-aware execution rules, and the cross-page cyberpunk presentation contract
 - Owner: CTO
-- Last updated: 2026-07-19
-- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md); [ADR-002: Live market data and browser delivery](./adr/ADR-002-live-market-data-and-browser-delivery.md); [ADR-003: Markets read models and comparative chart](./adr/ADR-003-markets-read-models-and-comparative-chart.md); [ADR-004: Side-aware execution rules and aggregate book semantics](./adr/ADR-004-side-aware-execution-rules-and-aggregate-book-semantics.md)
+- Last updated: 2026-07-21
+- Related PRDs/ADRs: [Market Lens PRD](../product/market-lens-prd.md); [Market Lens design system](../../design-system/market-lens/MASTER.md); [ADR-001: Market-data ingestion and normalization](./adr/ADR-001-market-data-ingestion-and-normalization.md); [ADR-002: Live market data and browser delivery](./adr/ADR-002-live-market-data-and-browser-delivery.md); [ADR-003: Markets read models and comparative chart](./adr/ADR-003-markets-read-models-and-comparative-chart.md); [ADR-004: Side-aware execution rules and aggregate book semantics](./adr/ADR-004-side-aware-execution-rules-and-aggregate-book-semantics.md); [ADR-005: Token-driven cyberpunk presentation](./adr/ADR-005-token-driven-cyberpunk-presentation.md)
 
 ## Context and goals
 
 Komper Market Lens compares the estimated outcome of buying or selling an asset for a specified IDR notional across Indodax, Reku, and Tokocrypto. The estimate is derived from available order-book levels rather than the last traded price. It must expose the data time, venue, depth consumed, estimated average price, slippage, and fee assumptions so a user can judge the comparison. The Markets extension adds a browsable IDR market overview and pair detail that compare ticker statistics, order-book liquidity, recent transaction activity, and aligned OHLC history without implying that unlike venue feeds are perfectly equivalent.
 
-Current state on 2026-07-18 is REST-snapshot only: each comparison calls `VenueAdapter.getBook()` and the browser polls `/api/comparisons` every 15 seconds. There is no exchange WebSocket worker, canonical live-book store, or browser live-delivery endpoint. The following accepted scope adds those pieces without weakening the existing decimal, increment, schema, fee, and health gates.
+The baseline recorded on 2026-07-18 was REST-snapshot only: each comparison called `VenueAdapter.getBook()` and the browser polled `/api/comparisons` every 15 seconds. There was no exchange WebSocket worker, canonical live-book store, or browser live-delivery endpoint. The following accepted scope adds those pieces without weakening the existing decimal, increment, schema, fee, and health gates.
+
+The presentation baseline inspected on 2026-07-21 is a light Tailwind theme whose palette is exposed through concrete aliases such as `cream`, `navy`, `coral`, and `mint`. Presentation rules are repeated across `App.tsx`, `MarketPages.tsx`, `Results.tsx`, `ComparisonForm.tsx`, `Logo.tsx`, and Highcharts options. The accepted target reworks the landing, markets overview, market detail, and not-found routes into one dark cyberpunk visual language without changing route identity, query keys, API contracts, financial semantics, or user-visible disclosures. This is a presentation migration, not a new application shell or navigation architecture.
 
 The repository contains API documentation collections for all three venues. Their interfaces are not symmetric:
 
@@ -35,12 +37,12 @@ Explicit non-goals for the first release are:
 - **Correctness:** Monetary values and quantities use decimal arithmetic. Venue payloads are schema-validated before entering canonical state. A book is eligible for comparison only after its synchronization rules pass.
 - **Freshness:** Every normalized event records source time when supplied, receive time, processing time, connection epoch, and sequence/update identifiers when available. Product status distinguishes `LIVE`, `STALE`, `UNSYNCED`, `UNVERIFIED`, and `UNAVAILABLE`.
 - **Reliability:** Missing events, sequence gaps, schema drift, clock skew, disconnections, HTTP 429/418, and venue 5XX responses fail closed for alerts and rankings. Workers reconnect and resynchronize without preserving an unverified book.
-- **Performance:** The read path uses in-memory current-book state and a cache of precomputed estimates. Historical charts are capped at 1,000 closed candles per venue. Highcharts bundle impact is measured in the production build; route-level code splitting is an approved follow-up if the budget is exceeded, not a current guarantee. UI update frequency is bounded independently from ingest frequency. Concrete latency and throughput SLOs remain pending shadow-ingestion evidence.
+- **Performance:** The read path uses in-memory current-book state and a cache of precomputed estimates. Historical charts are capped at 1,000 closed candles per venue. Highcharts bundle impact is measured in the production build; route-level code splitting is an approved follow-up if the budget is exceeded, not a current guarantee. UI update frequency is bounded independently from ingest frequency. Theme effects use static CSS or compositor-safe `transform`/`opacity`; continuous filters, layout animation, a runtime theme engine, and a route-transition animation dependency are outside this rework. Concrete latency and throughput SLOs remain pending shadow-ingestion evidence.
 - **Security and privacy:** The MVP consumes public endpoints only and stores no customer exchange credentials or private account data. Administrative actions and configuration changes are audited.
-- **Maintainability:** Venue-specific parsing and routing remain inside capability-based adapters. Canonical contracts are versioned, and raw payload samples used for tests are separated from product domain objects.
+- **Maintainability:** Venue-specific parsing and routing remain inside capability-based adapters. Canonical contracts are versioned, and raw payload samples used for tests are separated from product domain objects. Cross-page presentation uses semantic tokens and shared primitives; page components do not own raw theme colors or independent motion timings.
 - **Observability:** Operators can determine, per venue and instrument, whether a comparison was omitted because of staleness, sequence gaps, schema rejection, rate limiting, or insufficient depth.
 - **Cost:** WebSocket streams are preferred for continuously changing data; REST calls are reserved for discovery, snapshots, recovery, and verification. Historical retention is bounded and configurable.
-- **Accessibility:** Status and ranking changes are conveyed by text and semantics, not color alone. The Highcharts Accessibility module and an equivalent semantic OHLC table are required; reduced-motion preferences apply to all chart/live-update animation.
+- **Accessibility:** Status and ranking changes are conveyed by text and semantics, not color alone. The Highcharts Accessibility module and an equivalent semantic OHLC table are required; reduced-motion preferences apply to all chart/live-update and decorative animation. The cyberpunk treatment must preserve WCAG 2.2 AA contrast, visible keyboard focus, semantic landmarks and headings, 44-by-44 CSS-pixel touch targets, browser zoom, and readable data at 200% text zoom.
 - **Comparable history:** Cross-venue absolute close prices use the same UTC buckets and IDR axis. Missing candles, including leading history before a later venue listing, remain gaps; they are never forward-filled, interpolated, or connected.
 
 ## System context
@@ -83,11 +85,34 @@ The exchange boundary is untrusted. Successful HTTP or WebSocket transport does 
 | Markets read-model service     | Builds bounded overview/detail projections for ticker, book, trade activity, and comparative OHLC without client fan-out | `MarketOverview`, `MarketDetail`, `OrderBookComparison`, `TradeActivity`, `CandleComparison` | Application engineering   |
 | Candle builder                 | Validates native candles or aggregates normalized trades/ticks into aligned UTC OHLCV buckets and records completeness | `CanonicalTrade`, `CanonicalCandle`, interval/coverage metadata   | Market-data engineering   |
 | Chart presentation             | Loads Highcharts on market detail, renders bounded close-price lines, period controls, partial/no-data status, and an equivalent data table | `CandleComparison`; `1d`, `1w`, `1y`, `all` period state          | Frontend engineering      |
+| Web presentation system        | Owns semantic theme, typography, spacing, elevation, focus, state, motion, and chart-presentation tokens shared by every browser route | CSS custom properties, Tailwind aliases, shared React primitives, Highcharts theme adapter | Frontend engineering      |
 | Current-state cache            | Serves synchronized books, catalog metadata, health, and recent estimates                                           | Keyed by venue, segment, and canonical instrument                 | Platform engineering      |
 | Bounded history store          | Supports charts, investigations, replay tests, and reliability evidence                                             | Normalized events or sampled book snapshots with retention policy | Data/platform engineering |
 | Query API                      | Provides read-only product contracts and preserves health/provenance in responses                                   | HTTP or typed RPC; no exchange credentials                        | Application engineering   |
 
 Component ownership names are functional placeholders until teams are assigned.
+
+### Cross-page presentation contract
+
+The current route parser and page boundaries remain in place: `/` renders the comparison landing page, `/markets` renders the browse view, `/markets/:pair` renders pair detail, and invalid paths render the not-found view. The rework may extract a shared header, footer, page frame, panel, button, field, status, and table treatment, but it must not couple presentation state to market-data state or alter deep-link behavior. Existing semantic names, labels, disclosures, loading/error/empty behavior, and user-facing Playwright locators remain stable unless the product requirements explicitly change them.
+
+The target presentation has three layers:
+
+| Layer | Contract | Constraint |
+| --- | --- | --- |
+| Primitive | Reviewed palette, type, spacing, radius, border, shadow, glow, z-index, and duration values | Defined once; never referenced directly by route components |
+| Semantic | `background`, `surface`, `surface-raised`, `foreground`, `muted-foreground`, `border`, cyan-led `primary`, magenta-led `accent`, `success`, `warning`, `danger`, `focus-ring`, and venue-series roles | CSS custom properties are the runtime source; Tailwind names and chart options consume the same roles; exact values require contrast approval |
+| Component | Page frame, navigation, panels, actions, fields, badges/statuses, tables, disclosure blocks, and chart chrome | Variants describe purpose and state, not a per-page color choice |
+
+The cyberpunk theme is the default and only shipped visual mode for this scope. Token indirection is retained for consistency and rollback, not to introduce an unrequested theme switcher. `color-scheme: dark` must match native controls. Orbitron is limited to display headings and short labels; readable sans-serif remains the prose face, while JetBrains Mono is reserved for numeric data and compact technical labels, with tabular numerals for prices. Font delivery must be self-hosted with `font-display: swap`/`optional`, or fall back to local system fonts; the page must not add Google Fonts or another third-party font origin at runtime.
+
+Cyberpunk effects are presentation-only. Scanlines, grid texture, glow, chamfered edges, and noise may be implemented with bounded pseudo-elements or static assets that ignore pointer input and never obscure copy or focus. Body copy remains at least 16 CSS pixels on mobile with a 1.5 line height. Status, change direction, venue identity, eligibility, and selected state require text, shape, icon, dash, or weight in addition to hue. Structural icons use a consistent SVG language; emoji and decorative text glyphs are not controls.
+
+Motion is CSS-first and purposeful. Interaction transitions use shared 150-300 ms duration/easing tokens and animate only `transform` and `opacity` where practical. Loading indicators and live-update cues must not cause layout shift, block input, or run as distracting perpetual animation. `prefers-reduced-motion: reduce` disables nonessential animation and smooth scrolling while leaving state changes immediately understandable. A dedicated animation library is justified only by a later interaction requirement and must pass bundle, reduced-motion, and interruption review; GSAP-style route overlays are not part of this rework.
+
+Highcharts does not reliably inherit document CSS into every rendered label and series option, so its React boundary maps semantic CSS token values to explicit chart options. The dark plot background, text, axes, grid, tooltip, focus, and series colors must remain legible. Venue series also retain names and non-color distinctions such as dash style or marker/legend treatment, and the accessible OHLC table remains the equivalent data path. Theme work must not re-enable chart animation.
+
+Responsive behavior remains mobile-first from the existing 320 CSS-pixel minimum. Verification widths are 320, 375, 768, 1024, and 1440 CSS pixels, landscape mobile, and 200% zoom. Pages must not introduce horizontal document scrolling; bounded data tables may retain local horizontal overflow with a visible affordance and keyboard access. Navigation, controls, and fixed/sticky elements must not cover content, adjacent targets retain at least 8 CSS pixels where practical, and pointer interactions cannot depend on hover alone.
 
 ## Key flows
 
@@ -417,6 +442,7 @@ Raw venue payload retention is off by default except for bounded, access-control
 - Public API abuse is controlled with user-level rate limits, request bounds, caching, and protection against arbitrary pair fan-out.
 - Market paths are parsed into canonical symbols and looked up in the registry. User input never selects an upstream hostname, raw venue symbol, Tokocrypto segment, arbitrary dates, or an interval. Pair length, depth, trade limit, allowlisted period, cursor, and response size are bounded before any adapter call.
 - The web application uses a restrictive Content Security Policy appropriate to its chart implementation. Chart labels and exchange-sourced names are rendered as text, external venue links use reviewed templates with `noopener noreferrer`, and no raw upstream HTML or image URL is trusted by default.
+- Cyberpunk textures, icons, and fonts are repository-owned or self-hosted build assets. The theme does not add remote font, icon, image, analytics, or animation-script origins to the Content Security Policy. CSS custom properties hold presentation values only; no untrusted venue value is interpolated into style or raw SVG markup.
 - Diagnostic payloads are sampled and bounded. Headers, query parameters, tokens, cookies, and future credentials are redacted before logging.
 - Alert configuration and delivery destinations are user data and follow the product privacy and deletion policy once defined.
 - If Portfolio or Execution is added later, it must use a separate credential service and trust boundary. The public market-data workers must never receive private API secrets.
@@ -463,6 +489,7 @@ Graceful shutdown marks readiness false, stops new SSE subscriptions, invalidate
 9. **Comparative history:** Backfill where a verified native endpoint permits it and begin bounded collection where it does not. Each plotted point remains the venue's absolute canonical close; comparative language requires two overlapping series.
 10. **Alerts and longer history:** Enable only after freshness suppression, persistence rules, replay, and operational alerting pass.
 11. **Coverage expansion:** Move pairs from `UNVERIFIED` through shadow validation into the browse union and, separately, the effective-price intersection. Rollback removes a pair, segment, venue capability, or Markets panel through configuration without changing canonical contracts.
+12. **Cross-page cyberpunk presentation:** Establish semantic CSS variables and Tailwind aliases first, then migrate shared primitives and route shells before page-specific sections. Adapt Highcharts at its React boundary and remove obsolete concrete palette use after all four route states pass contrast, responsive, keyboard, reduced-motion, and regression checks. No data migration or API rollout is required. Rollback restores the previous token map and component styling as one frontend change; route, query, and server behavior remain compatible.
 
 No private API or execution code is included in these phases. A separate architecture decision is required before expanding the trust boundary.
 
@@ -489,6 +516,10 @@ No private API or execution code is included in these phases. A separate archite
 | Highcharts module initialization or future SSR touches browser globals          | Development-only failures or hydration mismatch                  | Frontend engineering                 | Keep server imports forbidden, validate Vite pre-bundling, and use a client-only boundary if SSR is added  |
 | All-market overview could cause upstream request fan-out                        | Rate limiting, latency, or venue bans                           | Platform engineering                | Require batched venue capabilities, cache/single-flight, pagination, payload budgets, and load tests       |
 | Phase-1 detail aggregates capabilities with unlike size and cadence             | A slow component delays the snapshot and static OHLC may be retransferred with fast data | Application engineering | Keep bounded independent settlement and component timings; extract endpoints when latency/payload/retry thresholds are exceeded |
+| Neon accents, glow, fine grid/scanline texture, and monospaced copy reduce legibility | Users can misread prices, states, or disclosures, especially at zoom or with low vision | Frontend engineering and QA | Gate semantic token pairs with automated contrast checks; limit display type/effects; test 200% zoom and color-independent states |
+| Repeated page-local cyberpunk utilities drift across four routes                | Theme becomes costly to change and states become inconsistent | Frontend engineering | Require semantic tokens/shared primitives; reject raw palette values in route components during review |
+| Font or motion additions regress startup and interaction performance            | Financial data arrives behind presentation work or updates become janky | Frontend engineering | Self-host only required font files, use swap/optional loading, keep CSS-first motion, and compare production build/chunk evidence |
+| Existing Highcharts literal colors remain tuned for the light theme             | Axes, tooltips, series, and keyboard focus can become unreadable on dark surfaces | Frontend engineering and QA | Map semantic chart tokens at the React boundary; preserve accessibility module/table and non-color series identification |
 
 ## Verification
 
@@ -518,6 +549,9 @@ No private API or execution code is included in these phases. A separate archite
 - Comparative-chart property tests prove every non-null display point equals its canonical candle `close`, exact period/interval boundaries, Monday weekly alignment, no interpolation or substitution, deterministic gaps, and the 1,000-point-per-venue ceiling. Visual/accessibility tests expose the same absolute OHLC without relying on color or hover.
 - Performance tests prove overview ingestion uses at most one batched ticker operation per venue per refresh, identical concurrent requests are single-flighted, hidden/offline clients stop polling, payload budgets hold at the maximum page/depth/period, and one failing venue does not delay healthy venue responses beyond the configured timeout.
 - Accessibility checks for keyboard use, screen-reader status, non-color indicators, and reduced motion.
+- Theme contract checks cover every route and loading/empty/error/partial/success state at 320, 375, 768, 1024, and 1440 CSS pixels, landscape mobile, browser keyboard navigation, 200% text zoom, forced reduced motion, and absence of document-level horizontal overflow.
+- Automated accessibility evidence includes WCAG 2.2 AA contrast for normal text (4.5:1), large text and essential UI graphics (3:1), visible focus, semantic labels/roles/states, 44-by-44 CSS-pixel pointer targets, and status meaning that survives grayscale or color-vision simulation.
+- Frontend review verifies no raw cyberpunk palette values or per-page motion timings remain in route components; Highcharts is the explicit exception only through its semantic theme adapter. Production build evidence compares initial and chart chunks and confirms that no runtime theme engine, GSAP route overlay, or external font origin was introduced.
 - A 72-hour shadow-ingestion report containing environment, scope, pair coverage, gaps, schema failures, rate-limit observations, freshness distributions, and residual risks.
 - A threat-model review confirming that the MVP contains no exchange credential path and that endpoint configuration cannot be user-controlled.
 - Relevant format, type-check, lint, test, and build gates once implementation is scaffolded.

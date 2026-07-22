@@ -12,6 +12,7 @@ import {
   sizeBucket,
 } from '@client/lib/format.js';
 import { track } from '@client/lib/api.js';
+import { ExternalLinkIcon, StatusIcon } from '@client/components/Icons.js';
 
 const VENUE_NAMES: Record<Venue, string> = {
   INDODAX: 'Indodax',
@@ -21,39 +22,46 @@ const VENUE_NAMES: Record<Venue, string> = {
 
 const statusPresentation: Record<
   EstimateStatus,
-  { label: string; symbol: string; className: string }
+  { label: string; tone: 'success' | 'warning' | 'danger' | 'unavailable'; className: string }
 > = {
   ELIGIBLE: {
     label: 'Layak dibandingkan',
-    symbol: '✓',
-    className: 'bg-emerald-50 text-emerald-800',
+    tone: 'success',
+    className: 'state-success text-success',
   },
   INSUFFICIENT_DEPTH: {
     label: 'Depth tidak cukup',
-    symbol: '!',
-    className: 'bg-amber-50 text-amber-900',
+    tone: 'warning',
+    className: 'state-warning text-warning',
   },
   BELOW_MINIMUM: {
     label: 'Di bawah minimum',
-    symbol: '!',
-    className: 'bg-amber-50 text-amber-900',
+    tone: 'warning',
+    className: 'state-warning text-warning',
   },
-  STALE: { label: 'Data stale', symbol: '!', className: 'bg-amber-50 text-amber-900' },
-  UNSYNCED: { label: 'Belum sinkron', symbol: '!', className: 'bg-amber-50 text-amber-900' },
-  SCHEMA_ERROR: { label: 'Data ditolak', symbol: '×', className: 'bg-red-50 text-red-800' },
-  UNAVAILABLE: { label: 'Tidak tersedia', symbol: '×', className: 'bg-red-50 text-red-800' },
-  UNSUPPORTED: { label: 'Tidak didukung', symbol: '×', className: 'bg-slate-100 text-slate-700' },
+  STALE: { label: 'Data stale', tone: 'warning', className: 'state-warning text-warning' },
+  UNSYNCED: { label: 'Belum sinkron', tone: 'warning', className: 'state-warning text-warning' },
+  SCHEMA_ERROR: { label: 'Data ditolak', tone: 'danger', className: 'state-danger text-danger' },
+  UNAVAILABLE: { label: 'Tidak tersedia', tone: 'danger', className: 'state-danger text-danger' },
+  UNSUPPORTED: {
+    label: 'Tidak didukung',
+    tone: 'unavailable',
+    className: 'state-unavailable',
+  },
   UNVERIFIED_RULES: {
     label: 'Aturan belum terverifikasi',
-    symbol: '!',
-    className: 'bg-amber-50 text-amber-900',
+    tone: 'warning',
+    className: 'state-warning text-warning',
   },
 };
 
 function Freshness({ estimate }: { estimate: VenueEstimate }) {
   return (
-    <div className="flex items-start gap-2 text-xs text-slate-500">
-      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-mint" aria-hidden="true" />
+    <div className="flex items-start gap-2 text-xs text-muted">
+      <span
+        className={`status-dot mt-1 ${estimate.status === 'ELIGIBLE' ? 'text-success' : 'text-warning'}`}
+        aria-hidden="true"
+      />
       <span>
         Diterima {formatTime(estimate.receivedAt)} WIB
         <span className="block">
@@ -86,24 +94,24 @@ function EstimateCard({
   const quantityDigits = estimate.quantityIncrementRule.normalizedStep?.split('.')[1]?.length ?? 8;
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm ${isWinner ? 'border-coral ring-2 ring-coral/15' : 'border-slate-200'}`}
+      className={`hud-panel relative overflow-hidden p-5 ${isWinner ? 'border-primary ring-2 ring-primary/20' : ''}`}
       aria-label={`${VENUE_NAMES[estimate.venue]}: ${status.label}`}
     >
       {isWinner && (
-        <div className="absolute right-0 top-0 rounded-bl-xl bg-coral px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white">
+        <div className="absolute right-0 top-0 border-b border-l border-primary bg-primary-soft px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-primary">
           Pilihan {comparison.rankingBasis.toLowerCase()}
         </div>
       )}
       <div className="flex items-center gap-3 pr-20">
         <div
-          className="grid h-10 w-10 place-items-center rounded-xl bg-navy text-sm font-black text-white"
+          className="grid h-10 w-10 place-items-center rounded-sm border border-accent/40 bg-accent-soft font-display text-sm font-bold text-accent"
           aria-hidden="true"
         >
           {VENUE_NAMES[estimate.venue][0]}
         </div>
         <div>
-          <h3 className="font-extrabold text-ink">{VENUE_NAMES[estimate.venue]}</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="font-extrabold text-foreground">{VENUE_NAMES[estimate.venue]}</h3>
+          <p className="text-xs text-muted">
             {estimate.venueSymbol} · {estimate.marketSegment}
           </p>
         </div>
@@ -111,51 +119,53 @@ function EstimateCard({
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}
+          className={`inline-flex min-h-8 items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-bold ${status.className}`}
         >
-          <span aria-hidden="true">{status.symbol}</span>
+          <StatusIcon kind={status.tone} className="h-4 w-4 shrink-0" />
           {status.label}
         </span>
       </div>
 
       {estimate.grossOutcome ? (
         <>
-          <p className="mt-5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.14em] text-muted">
             {side === 'buy' ? 'Aset diterima (gross)' : 'Dana diterima (gross)'}
           </p>
-          <p className="mt-1 break-words text-2xl font-black tracking-[-0.04em] text-ink">
+          <p className="mt-1 break-words font-data text-2xl font-semibold tracking-[-0.04em] text-foreground tabular-nums">
             {estimate.outcomeAsset === 'IDR'
               ? formatOutcome(estimate.grossOutcome, estimate.outcomeAsset)
               : formatAsset(estimate.grossOutcome, estimate.outcomeAsset, quantityDigits)}
           </p>
-          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-100 py-4 text-sm">
+          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-border/50 py-4 text-sm">
             <div>
-              <dt className="text-xs text-slate-500">Harga rata-rata</dt>
-              <dd className="mt-0.5 font-bold tabular-nums text-ink">
+              <dt className="text-xs text-muted">Harga rata-rata</dt>
+              <dd className="mt-0.5 font-bold tabular-nums text-foreground">
                 {formatIdr(estimate.grossAveragePrice)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Slippage gross</dt>
-              <dd className="mt-0.5 font-bold tabular-nums text-ink">
+              <dt className="text-xs text-muted">Slippage gross</dt>
+              <dd className="mt-0.5 font-bold tabular-nums text-foreground">
                 {estimate.slippageBps ?? '—'} bps
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Level terpakai</dt>
-              <dd className="mt-0.5 font-bold text-ink">{estimate.levelsConsumed ?? '—'} level</dd>
+              <dt className="text-xs text-muted">Level terpakai</dt>
+              <dd className="mt-0.5 font-bold text-foreground">
+                {estimate.levelsConsumed ?? '—'} level
+              </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Belum terpenuhi</dt>
-              <dd className="mt-0.5 font-bold text-ink">
+              <dt className="text-xs text-muted">Belum terpenuhi</dt>
+              <dd className="mt-0.5 font-bold text-foreground">
                 {side === 'buy'
                   ? formatIdr(estimate.unfilledInput)
                   : formatAsset(estimate.unfilledInput, comparison.request.asset)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Kuantitas executable</dt>
-              <dd className="mt-0.5 font-bold text-ink">
+              <dt className="text-xs text-muted">Kuantitas executable</dt>
+              <dd className="mt-0.5 font-bold text-foreground">
                 {formatAsset(
                   estimate.executableBaseQuantity,
                   comparison.request.asset,
@@ -164,8 +174,8 @@ function EstimateCard({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Penyesuaian floor</dt>
-              <dd className="mt-0.5 font-bold text-ink">
+              <dt className="text-xs text-muted">Penyesuaian floor</dt>
+              <dd className="mt-0.5 font-bold text-foreground">
                 {formatAsset(
                   estimate.quantizationAdjustment,
                   comparison.request.asset,
@@ -176,15 +186,15 @@ function EstimateCard({
           </dl>
         </>
       ) : (
-        <p className="mt-5 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+        <p className="state-unavailable mt-5 rounded-md p-3 text-sm leading-6">
           {estimate.statusReason}
         </p>
       )}
 
       {estimate.grossOutcome && (
-        <p className="mt-3 text-xs leading-5 text-slate-600">{estimate.statusReason}</p>
+        <p className="mt-3 text-xs leading-5 text-muted">{estimate.statusReason}</p>
       )}
-      <div className="mt-4 rounded-xl bg-cream px-3.5 py-3 text-xs leading-5 text-slate-700">
+      <div className="mt-4 rounded-md border border-border/60 bg-surface-soft px-3.5 py-3 text-xs leading-5 text-muted">
         {estimate.fee.status === 'VERIFIED' ? (
           <>
             <strong>Estimasi fee:</strong>{' '}
@@ -200,8 +210,10 @@ function EstimateCard({
           </>
         )}
       </div>
-      <details className="mt-3 rounded-xl border border-slate-200 px-3.5 py-3 text-xs text-slate-600">
-        <summary className="cursor-pointer font-bold text-ink">Provenance aturan increment</summary>
+      <details className="mt-3 rounded-md border border-border px-3.5 py-1 text-xs text-muted">
+        <summary className="flex min-h-11 cursor-pointer items-center font-bold text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25">
+          Provenance aturan increment
+        </summary>
         <dl className="mt-2 grid gap-2">
           {estimate.inputIncrementRule && (
             <div>
@@ -258,12 +270,10 @@ function EstimateCard({
             venue: estimate.venue,
           })
         }
-        className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-extrabold text-ink hover:border-coral hover:text-coral focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25"
+        className="action-secondary mt-5 w-full"
       >
-        Buka {VENUE_NAMES[estimate.venue]}{' '}
-        <span className="ml-2" aria-hidden="true">
-          ↗
-        </span>
+        Buka {VENUE_NAMES[estimate.venue]}
+        <ExternalLinkIcon className="h-4 w-4" />
         <span className="sr-only">di tab baru</span>
       </a>
     </article>
@@ -275,16 +285,14 @@ export function Results({ comparison }: { comparison: ComparisonResponse }) {
     <section className="mt-8" aria-labelledby="results-heading">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-coral">
-            Snapshot {formatTime(comparison.generatedAt)} WIB
-          </p>
+          <p className="eyebrow">Snapshot {formatTime(comparison.generatedAt)} WIB</p>
           <h2
             id="results-heading"
-            className="mt-1 text-2xl font-extrabold tracking-[-0.035em] text-ink"
+            className="mt-1 text-2xl font-extrabold tracking-[-0.035em] text-foreground"
           >
             Hasil untuk {comparison.request.asset} / IDR
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             {comparison.request.side === 'buy'
               ? `Budget ${formatIdr(comparison.request.amount)}`
               : `Jual ${formatAsset(comparison.request.amount, comparison.request.asset)}`}
@@ -292,7 +300,7 @@ export function Results({ comparison }: { comparison: ComparisonResponse }) {
         </div>
         <div
           aria-live="polite"
-          className={`max-w-xl rounded-xl px-4 py-3 text-sm font-bold ${comparison.winner ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-950'}`}
+          className={`max-w-xl rounded-md px-4 py-3 text-sm font-bold ${comparison.winner ? 'state-success text-success' : 'state-warning text-warning'}`}
         >
           {comparison.winnerLabel ??
             `Belum ada pemenang: hanya ${comparison.eligibleVenueCount} venue yang layak.`}
@@ -304,7 +312,7 @@ export function Results({ comparison }: { comparison: ComparisonResponse }) {
         ))}
       </div>
       <aside
-        className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"
+        className="state-warning mt-5 rounded-md p-4 text-sm leading-6"
         aria-label="Pengungkapan estimasi"
       >
         <strong>Estimasi — bukan kuotasi yang dapat dieksekusi.</strong> {comparison.disclosure}{' '}

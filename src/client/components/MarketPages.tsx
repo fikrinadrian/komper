@@ -86,22 +86,22 @@ function venueFor(venues: MarketOverviewVenue[], venue: Venue): MarketOverviewVe
 
 function MarketHeader() {
   return (
-    <header id="top" className="bg-navy text-white">
+    <header id="top" className="hud-header">
       <nav
         aria-label="Navigasi utama"
-        className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8"
+        className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8"
       >
         <Logo />
-        <div className="flex items-center gap-2 text-sm font-bold">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm font-bold">
           <a
             href="/markets"
-            className="rounded-lg px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40"
+            className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-muted hover:bg-foreground/10 hover:text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/40"
           >
             Markets
           </a>
           <a
             href="/"
-            className="rounded-lg border border-white/20 px-3 py-2 text-white hover:bg-white/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/40"
+            className="inline-flex min-h-11 items-center rounded-md border border-foreground/20 px-3 py-2 text-foreground hover:bg-foreground/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/40"
           >
             Simulasi transaksi
           </a>
@@ -113,8 +113,8 @@ function MarketHeader() {
 
 function MarketFooter({ generatedAt }: { generatedAt?: string }) {
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-slate-500 sm:flex-row sm:justify-between sm:px-8">
+    <footer className="mt-auto border-t border-border/70 bg-surface-strong">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-muted sm:flex-row sm:justify-between sm:px-8">
         <span>Komper Market Lens · Data publik observasional</span>
         <span>
           {generatedAt ? `Diperbarui ${formatDateTime(generatedAt)} WIB` : 'Waktu dalam WIB'}
@@ -126,24 +126,20 @@ function MarketFooter({ generatedAt }: { generatedAt?: string }) {
 
 function LoadingPanel({ label }: { label: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6" role="status">
-      <div className="h-5 w-44 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" />
-      <div className="mt-5 h-28 animate-pulse rounded-xl bg-slate-100 motion-reduce:animate-none" />
-      <p className="mt-4 text-sm text-slate-500">{label}</p>
+    <div className="hud-panel-static p-6" role="status">
+      <div className="h-5 w-44 animate-pulse rounded bg-surface-raised motion-reduce:animate-none" />
+      <div className="mt-5 h-28 animate-pulse rounded-xl bg-surface-raised motion-reduce:animate-none" />
+      <p className="mt-4 text-sm text-muted">{label}</p>
     </div>
   );
 }
 
 function ErrorPanel({ message, retry }: { message: string; retry: () => void }) {
   return (
-    <div className="rounded-2xl border border-red-200 bg-red-50 p-6" role="alert">
-      <h2 className="text-lg font-extrabold text-red-950">Data market gagal dimuat</h2>
-      <p className="mt-2 text-sm text-red-800">{message}</p>
-      <button
-        type="button"
-        onClick={retry}
-        className="mt-5 rounded-xl bg-red-800 px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-red-300"
-      >
+    <div className="state-danger rounded-md p-6" role="alert">
+      <h2 className="text-lg font-extrabold text-danger">Data market gagal dimuat</h2>
+      <p className="mt-2 text-sm text-danger">{message}</p>
+      <button type="button" onClick={retry} className="action-danger mt-5">
         Coba lagi
       </button>
     </div>
@@ -152,7 +148,7 @@ function ErrorPanel({ message, retry }: { message: string; retry: () => void }) 
 
 function MissingValue({ reason }: { reason?: string }) {
   return (
-    <span className="block text-sm text-slate-500">
+    <span className="block text-sm text-muted">
       Tidak tersedia{reason ? <span className="mt-1 block text-xs">{reason}</span> : null}
     </span>
   );
@@ -173,17 +169,15 @@ export function MarketsPage() {
     ) ?? [];
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream text-ink">
+    <div className="app-shell flex flex-col">
       <MarketHeader />
       <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
         <div className="max-w-3xl">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-coral">
-            Ringkasan market
-          </p>
+          <p className="eyebrow">Ringkasan market</p>
           <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] sm:text-5xl">
             Harga terakhir, berdampingan.
           </h1>
-          <p className="mt-4 max-w-2xl leading-7 text-slate-600">
+          <p className="mt-4 max-w-2xl leading-7 text-muted">
             Bandingkan last price spot IDR yang dilaporkan setiap exchange. Buka pair untuk melihat
             pricing, order book, aktivitas transaksi, dan pergerakan OHLC pada waktu yang sama.
           </p>
@@ -195,9 +189,9 @@ export function MarketsPage() {
             <ErrorPanel message={markets.error.message} retry={() => void markets.refetch()} />
           )}
           {markets.data && markets.data.rows.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center">
+            <div className="hud-panel-static border-dashed bg-surface/60 p-10 text-center">
               <h2 className="text-lg font-extrabold">Belum ada pair untuk dibandingkan</h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-muted">
                 Market akan muncul setelah setidaknya satu sumber menyediakan ticker yang valid.
               </p>
             </div>
@@ -209,11 +203,11 @@ export function MarketsPage() {
                   <h2 id="market-table-heading" className="text-xl font-extrabold">
                     Perbandingan last price
                   </h2>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-muted">
                     Snapshot {formatDateTime(markets.data.generatedAt)} WIB
                   </p>
                 </div>
-                <label className="grid min-w-[16rem] gap-1.5 text-sm font-bold text-ink">
+                <label className="grid w-full min-w-0 gap-1.5 text-sm font-bold text-foreground sm:w-auto sm:min-w-[16rem]">
                   Cari pair
                   <input
                     type="search"
@@ -223,21 +217,26 @@ export function MarketsPage() {
                       setVisibleLimit(100);
                     }}
                     placeholder="Contoh: BTC"
-                    className="input-control"
+                    className="input-control w-full min-w-0"
                   />
                 </label>
                 {markets.isFetching && !markets.isPending && (
-                  <span className="text-xs font-bold text-slate-500" role="status">
+                  <span className="text-xs font-bold text-muted" role="status">
                     Memperbarui…
                   </span>
                 )}
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-panel">
-                <table className="w-full min-w-[760px] border-collapse text-left">
+              <div
+                className="table-shell"
+                role="region"
+                aria-labelledby="market-table-heading"
+                tabIndex={0}
+              >
+                <table className="data-table w-full min-w-[760px] border-collapse text-left">
                   <caption className="sr-only">
                     Last price setiap pair pada Indodax, Reku, dan Tokocrypto
                   </caption>
-                  <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                  <thead className="bg-surface-soft text-xs uppercase tracking-wider text-muted">
                     <tr>
                       <th scope="col" className="px-5 py-4 font-extrabold">
                         Pair
@@ -249,17 +248,17 @@ export function MarketsPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-border/50">
                     {filteredRows.slice(0, visibleLimit).map((row) => (
-                      <tr key={row.pair} className="transition-colors hover:bg-slate-50/70">
+                      <tr key={row.pair} className="transition-colors hover:bg-primary-soft/30">
                         <th scope="row" className="px-5 py-5">
                           <a
                             href={`/markets/${row.asset.toLowerCase()}-idr`}
-                            className="inline-flex rounded-md font-extrabold text-ink underline decoration-coral/40 decoration-2 underline-offset-4 hover:decoration-coral focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25"
+                            className="inline-flex min-h-11 items-center rounded-md font-extrabold text-foreground underline decoration-primary/40 decoration-2 underline-offset-4 hover:decoration-primary focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25"
                           >
                             {row.asset}/IDR
                           </a>
-                          <span className="mt-1 block text-xs font-normal text-slate-500">
+                          <span className="mt-1 block text-xs font-normal text-muted">
                             Lihat detail
                           </span>
                         </th>
@@ -276,17 +275,17 @@ export function MarketsPage() {
                                   <span
                                     className={`mt-1 block text-xs font-bold tabular-nums ${
                                       Number(item.ticker.priceChangePercent24h) > 0
-                                        ? 'text-emerald-700'
+                                        ? 'text-success'
                                         : Number(item.ticker.priceChangePercent24h) < 0
-                                          ? 'text-red-700'
-                                          : 'text-slate-500'
+                                          ? 'text-danger'
+                                          : 'text-muted'
                                     }`}
                                   >
                                     {formatPercent(item.ticker.priceChangePercent24h)} · 24 jam
                                   </span>
                                   <span
                                     className={`mt-1 block text-xs font-bold ${
-                                      item.status === 'STALE' ? 'text-red-700' : 'text-slate-500'
+                                      item.status === 'STALE' ? 'text-danger' : 'text-muted'
                                     }`}
                                   >
                                     {item.status === 'STALE' ? 'Stale' : 'Usia'} ·{' '}
@@ -308,7 +307,7 @@ export function MarketsPage() {
                 </table>
               </div>
               {filteredRows.length === 0 && (
-                <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-600">
+                <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted">
                   Pair yang cocok tidak ditemukan.
                 </p>
               )}
@@ -316,12 +315,12 @@ export function MarketsPage() {
                 <button
                   type="button"
                   onClick={() => setVisibleLimit((current) => current + 100)}
-                  className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25"
+                  className="action-secondary mt-4"
                 >
                   Tampilkan 100 pair berikutnya
                 </button>
               )}
-              <p className="mt-4 text-xs leading-5 text-slate-500">{markets.data.disclosure}</p>
+              <p className="mt-4 text-xs leading-5 text-muted">{markets.data.disclosure}</p>
             </section>
           )}
         </div>
@@ -368,7 +367,7 @@ function MovementChart({ pair }: { pair: string }) {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div
-          className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1"
+          className="inline-grid grid-cols-4 rounded-md border border-border bg-surface-raised p-1"
           role="group"
           aria-label="Timeframe grafik"
         >
@@ -378,10 +377,10 @@ function MovementChart({ pair }: { pair: string }) {
               type="button"
               aria-pressed={period === item.value}
               onClick={() => setPeriod(item.value)}
-              className={`rounded-lg px-4 py-2 text-xs font-extrabold transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25 ${
+              className={`min-h-11 rounded-sm px-4 py-2 text-xs font-extrabold transition-colors duration-ui focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25 ${
                 period === item.value
-                  ? 'bg-white text-ink shadow-sm'
-                  : 'text-slate-500 hover:text-ink'
+                  ? 'bg-primary-soft text-primary ring-1 ring-primary/35'
+                  : 'text-muted hover:bg-surface-soft hover:text-foreground'
               }`}
             >
               {item.label}
@@ -389,7 +388,7 @@ function MovementChart({ pair }: { pair: string }) {
           ))}
         </div>
         {chart.isFetching && !chart.isPending && (
-          <span role="status" className="text-xs font-bold text-slate-500">
+          <span role="status" className="text-xs font-bold text-muted">
             {chart.isPlaceholderData
               ? `Memuat ${period.toUpperCase()} · grafik ${chart.data?.period.toUpperCase()} tetap ditampilkan…`
               : `Memperbarui grafik ${period.toUpperCase()}…`}
@@ -404,16 +403,13 @@ function MovementChart({ pair }: { pair: string }) {
         <ErrorPanel message={chart.error.message} retry={() => void chart.refetch()} />
       )}
       {chart.isError && retainedData && (
-        <p role="status" className="mb-4 text-xs font-bold text-slate-600">
+        <p role="status" className="mb-4 text-xs font-bold text-muted">
           Grafik {retainedData.period.toUpperCase()} terakhir tetap ditampilkan saat{' '}
           {period.toUpperCase()} dimuat ulang.
         </p>
       )}
       {displayedData && unavailable && unavailable.length > 0 && (
-        <div
-          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950"
-          role="status"
-        >
+        <div className="state-warning mb-4 rounded-md px-4 py-3 text-xs leading-5" role="status">
           <strong>Data grafik parsial.</strong>{' '}
           {unavailable
             .map((item) => `${VENUE_LABEL[item.venue]}: ${item.reason ?? 'candle tidak tersedia'}`)
@@ -421,13 +417,13 @@ function MovementChart({ pair }: { pair: string }) {
         </div>
       )}
       {displayedData && !hasData && (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted">
           Candle untuk timeframe ini belum tersedia di ketiga exchange.
         </div>
       )}
       {displayedData && model && hasData && (
         <>
-          <p className="highcharts-description mb-3 text-xs leading-5 text-slate-600">
+          <p className="highcharts-description mb-3 text-xs leading-5 text-muted">
             {comparisonEligible
               ? `Line chart membandingkan harga close absolut ${displayedData.pair} pada waktu yang overlap.`
               : `Line chart ini hanya menampilkan histori observasional ${displayedData.pair} karena belum ada dua exchange yang overlap pada timestamp yang sama.`}{' '}
@@ -437,7 +433,7 @@ function MovementChart({ pair }: { pair: string }) {
             fallback={
               <div
                 role="status"
-                className="h-[410px] animate-pulse rounded-xl bg-slate-100 p-5 text-sm text-slate-500 motion-reduce:animate-none"
+                className="h-[410px] animate-pulse rounded-xl bg-surface-raised p-5 text-sm text-muted motion-reduce:animate-none"
               >
                 Menyiapkan visualisasi grafik…
               </div>
@@ -450,7 +446,7 @@ function MovementChart({ pair }: { pair: string }) {
               comparisonEligible={comparisonEligible}
             />
           </Suspense>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <p className="mt-3 text-xs leading-5 text-muted">
             Timeframe {displayedData.period.toUpperCase()} · interval candle{' '}
             {displayedData.interval} · snapshot {formatDateTime(displayedData.generatedAt)} WIB.
             Cakupan aktual {formatDateTime(new Date(model.timestamps[0]).toISOString())}–
@@ -458,8 +454,8 @@ function MovementChart({ pair }: { pair: string }) {
             close tiap bucket OHLC, bukan kuotasi bid/ask yang dapat dieksekusi.
           </p>
           {displayedData.period === 'all' && (
-            <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-              <p className="font-extrabold text-ink">Cakupan histori All per exchange</p>
+            <div className="mt-3 rounded-xl bg-surface-soft px-4 py-3 text-xs leading-5 text-muted">
+              <p className="font-extrabold text-foreground">Cakupan histori All per exchange</p>
               <ul className="mt-1 space-y-1">
                 {displayedData.venues.map((venue) => (
                   <li key={venue.venue}>
@@ -476,16 +472,21 @@ function MovementChart({ pair }: { pair: string }) {
               </p>
             </div>
           )}
-          <details className="mt-4 rounded-xl border border-slate-200 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25">
+          <details className="mt-4 rounded-md border border-border px-4 py-1">
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-extrabold focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25">
               Data grafik aksesibel
             </summary>
-            <div className="mt-4 max-h-80 overflow-auto">
-              <table className="w-full min-w-[680px] text-left text-xs">
+            <div
+              className="table-shell mt-4 max-h-80"
+              role="region"
+              aria-label="Data OHLC grafik aksesibel"
+              tabIndex={0}
+            >
+              <table className="data-table w-full min-w-[680px] text-left text-xs">
                 <caption className="sr-only">
                   Harga OHLC Indodax, Reku, dan Tokocrypto pada setiap waktu
                 </caption>
-                <thead className="sticky top-0 bg-white text-slate-500">
+                <thead className="sticky top-0 bg-surface text-muted">
                   <tr>
                     <th scope="col" className="py-2 pr-3">
                       Waktu (WIB)
@@ -499,7 +500,7 @@ function MovementChart({ pair }: { pair: string }) {
                 </thead>
                 <tbody>
                   {model.timestamps.map((timestamp, rowIndex) => (
-                    <tr key={timestamp} className="border-t border-slate-100">
+                    <tr key={timestamp} className="border-t border-border/50">
                       <th scope="row" className="py-2 pr-3 font-medium">
                         {formatDateTime(new Date(timestamp).toISOString())}
                       </th>
@@ -540,10 +541,15 @@ function PricingComparison({
   generatedAt: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full min-w-[980px] text-left text-sm">
+    <div
+      className="table-shell"
+      role="region"
+      aria-label="Perbandingan pricing dan ticker 24 jam per exchange"
+      tabIndex={0}
+    >
+      <table className="data-table w-full min-w-[980px] text-left text-sm">
         <caption className="sr-only">Perbandingan pricing dan ticker 24 jam per exchange</caption>
-        <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+        <thead className="bg-surface-soft text-xs uppercase tracking-wider text-muted">
           <tr>
             <th scope="col" className="px-5 py-4">
               Exchange
@@ -568,7 +574,7 @@ function PricingComparison({
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-border/50">
           {venues.map((item) => (
             <tr key={item.venue}>
               <th scope="row" className="px-5 py-4 font-extrabold">
@@ -583,11 +589,11 @@ function PricingComparison({
                         {formatIdr(item.ticker.lastPrice)}
                       </td>
                       <td className="px-5 py-4 text-right tabular-nums">
-                        {formatIdr(item.ticker.bestBid)} <span className="text-slate-400">/</span>{' '}
+                        {formatIdr(item.ticker.bestBid)} <span className="text-muted">/</span>{' '}
                         {formatIdr(item.ticker.bestAsk)}
                       </td>
                       <td className="px-5 py-4 text-right tabular-nums">
-                        {formatIdr(item.ticker.low24h)} <span className="text-slate-400">/</span>{' '}
+                        {formatIdr(item.ticker.low24h)} <span className="text-muted">/</span>{' '}
                         {formatIdr(item.ticker.high24h)}
                       </td>
                       <td className="px-5 py-4 text-right font-bold tabular-nums">
@@ -597,7 +603,7 @@ function PricingComparison({
                         {tickerSpread ? (
                           <>
                             {tickerSpread.idr}
-                            <span className="block text-xs text-slate-500">{tickerSpread.bps}</span>
+                            <span className="block text-xs text-muted">{tickerSpread.bps}</span>
                           </>
                         ) : (
                           '—'
@@ -630,14 +636,14 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       {venues.map((item) => (
-        <article key={item.venue} className="rounded-2xl border border-slate-200 bg-white p-5">
+        <article key={item.venue} className="hud-panel min-w-0 p-5">
           <h3 className="font-extrabold">{VENUE_LABEL[item.venue]}</h3>
           {item.orderBook ? (
             <div className="mt-4 grid gap-5">
               {(
                 [
-                  ['Bid', item.orderBook.bids, 'text-emerald-700'],
-                  ['Ask', item.orderBook.asks, 'text-red-700'],
+                  ['Bid', item.orderBook.bids, 'text-success'],
+                  ['Ask', item.orderBook.asks, 'text-danger'],
                 ] as const
               ).map(([label, levels, color]) => {
                 let cumulativeBase = new Decimal(0);
@@ -653,12 +659,18 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
                   };
                 });
                 return (
-                  <div key={label}>
-                    <table className="w-full text-right text-xs tabular-nums">
+                  <div
+                    key={label}
+                    className="table-shell"
+                    role="region"
+                    aria-label={`${label} order book ${VENUE_LABEL[item.venue]}`}
+                    tabIndex={0}
+                  >
+                    <table className="data-table w-full min-w-[340px] text-right text-xs tabular-nums">
                       <caption className={`mb-2 text-left font-extrabold ${color}`}>
                         {label}
                       </caption>
-                      <thead className="text-slate-500">
+                      <thead className="text-muted">
                         <tr>
                           <th scope="col" className="pb-1 text-left">
                             Harga
@@ -676,7 +688,7 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
                       </thead>
                       <tbody>
                         {rows.map((level, index) => (
-                          <tr key={`${level.price}-${index}`} className="border-t border-slate-100">
+                          <tr key={`${level.price}-${index}`} className="border-t border-border/50">
                             <td className="py-1 text-left">{formatIdr(level.price, true)}</td>
                             <td className="py-1">
                               {formatAsset(level.quantity, asset, 4).replace(` ${asset}`, '')}
@@ -689,7 +701,7 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
                         ))}
                         {levels.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="py-3 text-left text-slate-500">
+                            <td colSpan={4} className="py-3 text-left text-muted">
                               Kosong
                             </td>
                           </tr>
@@ -697,7 +709,7 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
                       </tbody>
                     </table>
                     {rows.length > 0 && rows.length < 5 && (
-                      <p className="mt-1 text-left text-[11px] font-bold text-amber-700">
+                      <p className="mt-1 text-left text-[11px] font-bold text-warning">
                         Hanya {rows.length} level tersedia pada snapshot ini.
                       </p>
                     )}
@@ -713,7 +725,7 @@ function OrderBookComparison({ venues, asset }: { venues: MarketDetailVenue[]; a
             </div>
           )}
           {item.orderBook && (
-            <p className="mt-4 text-xs text-slate-500">
+            <p className="mt-4 text-xs text-muted">
               Snapshot {formatTime(item.orderBook.sourceEventAt ?? item.orderBook.receivedAt)} WIB
               {!item.orderBook.freshnessIndependentlyVerified
                 ? ' · Kesegaran belum diverifikasi independen'
@@ -730,18 +742,18 @@ function ActivityComparison({ venues, asset }: { venues: MarketDetailVenue[]; as
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       {venues.map((item) => (
-        <article key={item.venue} className="rounded-2xl border border-slate-200 bg-white p-5">
+        <article key={item.venue} className="hud-panel min-w-0 p-5">
           <h3 className="font-extrabold">{VENUE_LABEL[item.venue]}</h3>
           {item.ticker ? (
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-xs text-slate-500">Volume {asset} · 24j</dt>
+                <dt className="text-xs text-muted">Volume {asset} · 24j</dt>
                 <dd className="mt-1 font-bold tabular-nums">
                   {formatAsset(item.ticker.baseVolume24h, asset, 4)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-500">Volume IDR · 24j</dt>
+                <dt className="text-xs text-muted">Volume IDR · 24j</dt>
                 <dd className="mt-1 font-bold tabular-nums">
                   {formatIdr(item.ticker.quoteVolume24h, true)}
                 </dd>
@@ -752,13 +764,18 @@ function ActivityComparison({ venues, asset }: { venues: MarketDetailVenue[]; as
               <MissingValue reason={item.components.ticker.reason ?? item.reason} />
             </div>
           )}
-          <h4 className="mt-5 border-t border-slate-100 pt-4 text-xs font-extrabold uppercase tracking-wider text-slate-500">
+          <h4 className="mt-5 border-t border-border/50 pt-4 text-xs font-extrabold uppercase tracking-wider text-muted">
             Transaksi publik terbaru
           </h4>
           {item.tradeSampleStatus === 'AVAILABLE' && item.trades?.length ? (
-            <div className="mt-2 max-h-52 overflow-auto">
-              <table className="w-full text-xs tabular-nums">
-                <thead className="text-slate-500">
+            <div
+              className="table-shell mt-2 max-h-52"
+              role="region"
+              aria-label={`Transaksi publik terbaru ${VENUE_LABEL[item.venue]}`}
+              tabIndex={0}
+            >
+              <table className="data-table w-full min-w-[420px] text-xs tabular-nums">
+                <thead className="text-muted">
                   <tr>
                     <th scope="col" className="py-1 text-left">
                       Waktu
@@ -779,10 +796,10 @@ function ActivityComparison({ venues, asset }: { venues: MarketDetailVenue[]; as
                 </thead>
                 <tbody>
                   {item.trades.slice(0, 10).map((trade) => (
-                    <tr key={trade.id} className="border-t border-slate-100">
+                    <tr key={trade.id} className="border-t border-border/50">
                       <td className="py-1.5 text-left">{formatTime(trade.occurredAt)}</td>
                       <td
-                        className={`py-1.5 text-right ${trade.side === 'buy' ? 'text-emerald-700' : trade.side === 'sell' ? 'text-red-700' : ''}`}
+                        className={`py-1.5 text-right ${trade.side === 'buy' ? 'text-success' : trade.side === 'sell' ? 'text-danger' : ''}`}
                       >
                         {formatIdr(trade.price, true)}
                       </td>
@@ -801,7 +818,7 @@ function ActivityComparison({ venues, asset }: { venues: MarketDetailVenue[]; as
               </table>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">
+            <p className="mt-3 text-sm text-muted">
               {item.components.trades.reason ?? 'Sampel transaksi publik tidak tersedia.'}
             </p>
           )}
@@ -815,16 +832,18 @@ function OhlcTables({ venues }: { venues: MarketDetailVenue[] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       {venues.map((item) => (
-        <article
-          key={item.venue}
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
-        >
+        <article key={item.venue} className="hud-panel-static min-w-0 overflow-hidden">
           <h3 className="px-5 pt-5 font-extrabold">{VENUE_LABEL[item.venue]}</h3>
           {item.candles?.length ? (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[390px] text-right text-xs tabular-nums">
+            <div
+              className="table-shell mt-3"
+              role="region"
+              aria-label={`OHLC 1 jam terbaru ${VENUE_LABEL[item.venue]}`}
+              tabIndex={0}
+            >
+              <table className="data-table w-full min-w-[390px] text-right text-xs tabular-nums">
                 <caption className="sr-only">OHLC 1 jam terbaru {VENUE_LABEL[item.venue]}</caption>
-                <thead className="bg-slate-50 text-slate-500">
+                <thead className="bg-surface-soft text-muted">
                   <tr>
                     <th scope="col" className="px-3 py-2 text-left">
                       Waktu
@@ -848,7 +867,7 @@ function OhlcTables({ venues }: { venues: MarketDetailVenue[] }) {
                     .sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt))
                     .slice(0, 6)
                     .map((candle) => (
-                      <tr key={candle.openedAt} className="border-t border-slate-100">
+                      <tr key={candle.openedAt} className="border-t border-border/50">
                         <td className="px-3 py-2 text-left">{formatTime(candle.openedAt)}</td>
                         <td className="px-2 py-2">{formatIdr(candle.open, true)}</td>
                         <td className="px-2 py-2">{formatIdr(candle.high, true)}</td>
@@ -883,9 +902,9 @@ function SectionHeading({
 }) {
   return (
     <div className="mb-5 max-w-3xl">
-      <p className="text-xs font-black uppercase tracking-[0.16em] text-coral">{eyebrow}</p>
+      <p className="eyebrow">{eyebrow}</p>
       <h2 className="mt-1 text-2xl font-black tracking-[-0.035em]">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">{copy}</p>
     </div>
   );
 }
@@ -909,45 +928,41 @@ export function MarketDetailPage({ pair }: { pair: string }) {
   const label = pair.replace('-', '/').toUpperCase();
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream text-ink">
+    <div className="app-shell flex flex-col">
       <MarketHeader />
       <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
-        <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
+        <nav aria-label="Breadcrumb" className="text-sm text-muted">
           <ol className="flex items-center gap-2">
             <li>
               <a
                 href="/markets"
-                className="rounded underline underline-offset-4 hover:text-ink focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/25"
+                className="inline-flex min-h-11 items-center rounded-md underline underline-offset-4 hover:text-foreground focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/25"
               >
                 Markets
               </a>
             </li>
             <li aria-hidden="true">/</li>
-            <li aria-current="page" className="font-bold text-ink">
+            <li aria-current="page" className="font-bold text-foreground">
               {label}
             </li>
           </ol>
         </nav>
         <div className="mt-5 flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-coral">
-              Market detail
-            </p>
+            <p className="eyebrow">Market detail</p>
             <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] sm:text-5xl">{label}</h1>
-            <p className="mt-3 text-slate-600">
-              Perbandingan lintas exchange dalam satu pandangan.
-            </p>
+            <p className="mt-3 text-muted">Perbandingan lintas exchange dalam satu pandangan.</p>
           </div>
           {!markets.isPending &&
             (sizeComparisonEligible ? (
               <a
                 href={`/?asset=${encodeURIComponent(pair.split('-')[0].toUpperCase())}#top`}
-                className="rounded-xl bg-navy px-5 py-3 text-sm font-extrabold text-white hover:bg-ink focus:outline-none focus-visible:ring-4 focus-visible:ring-coral/30"
+                className="action-primary"
               >
                 Bandingkan simulasi transaksi
               </a>
             ) : (
-              <span className="max-w-xs rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs font-bold text-slate-600">
+              <span className="state-unavailable max-w-xs rounded-md px-4 py-3 text-xs font-bold">
                 Simulasi ukuran tersedia bila pair aktif di ketiga exchange.
               </span>
             ))}
@@ -961,22 +976,14 @@ export function MarketDetailPage({ pair }: { pair: string }) {
             <ErrorPanel message={markets.error.message} retry={() => void markets.refetch()} />
           )}
           {markets.data && supported === false && (
-            <div
-              className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center"
-              role="alert"
-            >
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">
-                Pair tidak didukung
-              </p>
-              <h2 className="mt-2 text-2xl font-black text-amber-950">{label} belum tersedia</h2>
-              <p className="mt-2 text-sm text-amber-900">
+            <div className="state-warning rounded-md p-8 text-center" role="alert">
+              <p className="eyebrow text-warning">Pair tidak didukung</p>
+              <h2 className="mt-2 text-2xl font-black text-warning">{label} belum tersedia</h2>
+              <p className="mt-2 text-sm text-foreground">
                 Pair ini tidak ada dalam katalog spot IDR terverifikasi. Tidak ada harga pengganti
                 yang diminta atau ditampilkan.
               </p>
-              <a
-                href="/markets"
-                className="mt-5 inline-flex rounded-xl bg-amber-900 px-5 py-3 text-sm font-extrabold text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
-              >
+              <a href="/markets" className="action-primary mt-5">
                 Lihat pair yang tersedia
               </a>
             </div>
@@ -990,7 +997,7 @@ export function MarketDetailPage({ pair }: { pair: string }) {
           {market.data && (
             <div className="space-y-14">
               {market.isFetching && !market.isPending && (
-                <p role="status" className="text-xs font-bold text-slate-500">
+                <p role="status" className="text-xs font-bold text-muted">
                   Memperbarui snapshot market…
                 </p>
               )}
@@ -998,7 +1005,7 @@ export function MarketDetailPage({ pair }: { pair: string }) {
                 (venue) => venue.status === 'UNAVAILABLE' || Boolean(venue.reason),
               ) && (
                 <div
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+                  className="state-warning flex flex-wrap items-center justify-between gap-3 rounded-md p-4 text-sm"
                   role="status"
                 >
                   <p>
@@ -1009,16 +1016,16 @@ export function MarketDetailPage({ pair }: { pair: string }) {
                     type="button"
                     onClick={() => void market.refetch()}
                     disabled={market.isFetching}
-                    className="rounded-lg bg-amber-900 px-4 py-2 text-xs font-extrabold text-white disabled:cursor-wait disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+                    className="action-secondary text-xs disabled:cursor-wait"
                   >
                     {market.isFetching ? 'Memuat ulang…' : 'Muat ulang snapshot'}
                   </button>
                 </div>
               )}
               {market.data.venues.every((venue) => venue.status === 'UNAVAILABLE') && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
+                <div className="hud-panel-static border-dashed bg-surface/60 p-8 text-center">
                   <h2 className="font-extrabold">Belum ada data untuk {label}</h2>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-muted">
                     Pair dikenali, tetapi semua sumber sedang tidak tersedia.
                   </p>
                 </div>
@@ -1046,7 +1053,7 @@ export function MarketDetailPage({ pair }: { pair: string }) {
                     copy="Line chart membandingkan harga close absolut tiap candle pada Indodax, Reku, dan Tokocrypto untuk timeframe 1 hari, 1 minggu, 1 tahun, atau seluruh histori yang tersedia."
                   />
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div className="hud-panel-static p-5 sm:p-6">
                   <MovementChart pair={pair} />
                 </div>
               </section>
@@ -1084,7 +1091,7 @@ export function MarketDetailPage({ pair }: { pair: string }) {
                 <OhlcTables venues={market.data.venues} />
               </section>
 
-              <p className="border-t border-slate-200 pt-5 text-xs leading-5 text-slate-500">
+              <p className="border-t border-border pt-5 text-xs leading-5 text-muted">
                 {market.data.disclosure}
               </p>
             </div>

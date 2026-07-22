@@ -5,7 +5,7 @@
 - Status: Draft
 - Product owner: `product_manager`
 - Technical owner: `cto`
-- Last updated: 2026-07-18
+- Last updated: 2026-07-21
 - Related issues/designs/ADRs: [Market Lens architecture](../architecture/market-lens-architecture.md); [ADR-001: Market-data ingestion and normalization](../architecture/adr/ADR-001-market-data-ingestion-and-normalization.md)
 
 ## Problem
@@ -26,6 +26,9 @@ Assumptions that remain unvalidated:
 - Commercial display, caching, and transformation of each exchange's public market data are permitted. This requires explicit review before public monetization.
 - A browse-first market overview and pair-detail view will help users identify which pair deserves a size-aware execution comparison; this repository does not yet contain observed usage evidence for those journeys.
 - Public last-trade, recent-trade, order-book, and candle data can be normalized to comparable time buckets for all three venues. Missing source timestamps, inconsistent candle boundaries, and retention limits remain technical validation items.
+- A cohesive cyberpunk presentation will make Market Lens more distinctive and feel appropriate for active crypto-market analysis without reducing financial trust, readability, or task completion. This is a design hypothesis requested for the product, not a validated user preference.
+
+Confirmed visual context in the current repository: the implemented routes use a warm cream, white-surface, navy, coral, and mint presentation across the comparison landing page, Markets list, pair detail, and not-found state. The visual rework is therefore a product-wide presentation change, not evidence of a new user problem or permission to change market semantics.
 
 ## Users and context
 
@@ -49,6 +52,8 @@ Proposed positioning:
 
 The product must not claim to cover all Indonesian exchanges, guarantee an executable quote, or guarantee arbitrage profit.
 
+The cyberpunk visual-rework outcome is a dark, high-contrast market-intelligence interface that feels like one coherent operator console across every route while preserving the current information architecture, Indonesian copy intent, data semantics, calculations, navigation, and recovery behavior. Visual novelty is subordinate to fast scanning, trustworthy venue/status identification, and accessible operation.
+
 This PRD also defines a Markets discovery increment. It adds `/markets` for scanning last prices across the named exchanges and `/markets/{pair}` for inspecting a pair's pricing, order books, public transaction activity, and OHLC history. Pair detail includes one Highcharts line chart that compares the candle close price from Indodax, Reku, and Tokocrypto over selectable `1D`, `1W`, `1Y`, and `All` periods. These views are observational context. They complement rather than replace the existing size-aware buy/sell comparison.
 
 ## Success measures
@@ -69,6 +74,10 @@ All targets below are product hypotheses for the first 30-day closed beta; they 
 | Market-view data completeness  | Unknown            | At least 95% of supported pair-detail loads show fresh pricing and order books from every venue where the pair is active; exclusions remain visible | Seven consecutive days before beta expansion | Per-capability health telemetry; excluded venues do not count as success |
 | Market-view responsiveness     | Unknown            | p75 initial `/markets` usable render at or below 2.5 seconds and pair-detail primary pricing at or below 3 seconds              | Closed beta, supported mobile and desktop profiles | Web-vitals and API latency telemetry |
 | Chart exploration              | Unknown            | At least 25% of pair-detail sessions select a non-default chart period and at least 95% of successful period requests render two or more eligible venue series | First 30 days | `market_chart_period_selected`, chart capability-health telemetry |
+| Cyberpunk journey parity       | Current functional journeys exist; reworked baseline not measured | **Proposed:** 100% of existing critical comparison, Markets, pair-detail, retry, and routing scenarios pass without a visual-rework regression | Every visual-rework release candidate | Existing automated suites plus the route/state evidence matrix defined in AC-34 through AC-44 |
+| Cyberpunk accessibility quality | Unknown | **Proposed:** zero critical or serious automated accessibility findings and 100% manual keyboard completion of the comparison and market-exploration journeys at 375 CSS px and 200% zoom | Every visual-rework release candidate | Automated accessibility scan, contrast report, keyboard/zoom QA evidence |
+| Visual clarity and distinctiveness | Unknown | **Proposed directional target:** at least 4 of 5 moderated closed-beta participants correctly identify venue and health state in representative screens and describe the interface as cyberpunk/futuristic without being prompted with that label | First visual-design validation round; do not generalize beyond the small sample | Moderated task notes and `visual_rework_feedback`; no claim of customer validation until observed |
+| Visual-rework performance      | Unknown for the reworked UI | **Proposed:** p75 LCP at or below 2.5 seconds, CLS at or below 0.1, and INP at or below 200 ms on supported mobile and desktop beta profiles | Closed beta and every release candidate | Web-vitals telemetry segmented by route family and build version |
 
 ## Scope
 
@@ -98,6 +107,18 @@ All targets below are product hypotheses for the first 30-day closed beta; they 
 - A coarser chart candle may be aggregated only from accepted closed canonical candles: open is the first valid open, high is the maximum high, low is the minimum low, and close is the last valid close in the target bucket. If any required constituent interval is absent, invalid, stale, duplicated with conflict, or still open, the target bucket is a gap; do not manufacture a close from a partial bucket. Volume aggregation is not required for the line chart.
 - Selecting a period requests that bounded period and resolution, keeps the prior successful chart visible with a non-blocking loading status, and replaces it only after a valid response. The selected period and venue visibility survive background refresh. A failed period request shows a retry action and retains the last successful chart with its previous-period label so old data cannot be mistaken for the new selection. Concurrent responses cannot overwrite a newer user selection.
 
+#### Cyberpunk all-page visual rework (P0)
+
+- Restyle every implemented route and shared state: `/`, `/markets`, `/markets/{pair}`, malformed-route not found, unsupported-pair, and the shared header, footer, form, result cards, search/list, tables, chart container and controls, disclosure, loading, empty, partial, stale, error, disabled, retry, and live/reconnecting treatments.
+- Establish one dark-first cyberpunk visual language: near-black or deep-navy foundations, clearly separated dark surfaces, restrained cyan as the primary interactive accent, restrained magenta as a secondary brand accent, off-white readable text, and independently distinguishable semantic success, warning, danger, and unavailable treatments. Exact token values require contrast verification before approval.
+- Use semantic design tokens for background, surface, text, border, focus, interactive, venue, and health roles. Decorative grid, glow, scan-line, clipped-corner, or circuit motifs may reinforce the theme only when they do not encode data, obscure copy, reduce contrast, or compete with the primary action.
+- Keep data presentation sober and legible: monospaced or tabular numerals may support prices, quantities, timestamps, and compact labels, while body copy remains a highly readable sans-serif at a minimum 16 CSS px on mobile with a 1.5 or greater line height.
+- Preserve the existing route map, content hierarchy, Indonesian product language, form inputs/defaults, calculation outputs, venue ordering, market/chart semantics, analytics intent, retry behavior, external-link behavior, and all legal/estimate disclosures. The rework must not invent data, imply faster freshness, or change winner eligibility.
+- Give every interactive control visible default, hover where applicable, active/pressed, focus-visible, disabled, pending, success, and error states. Primary touch targets are at least 44 by 44 CSS px with at least 8 CSS px separation where adjacent.
+- Use motion only to communicate state, hierarchy, or continuity. Micro-interactions should normally complete in 150–300 ms, must not block input or cause layout shift, and nonessential glow, reveal, scan, or chart animation must be disabled when `prefers-reduced-motion: reduce` is active.
+- Preserve a single obvious primary action per section, predictable navigation, visible focus, keyboard operation, programmatic labels, and text/icon reinforcement for every health or winner state; neon color alone is never the only signal.
+- Adapt the same information hierarchy from 320 CSS px upward. At 375 CSS px, 768 CSS px, 1024 CSS px, 1440 CSS px, and 200% zoom, the page must not introduce page-level horizontal scrolling, clipped actions, or detached venue/unit labels. A deliberately scrollable data table may use its own labeled region and visible affordance without forcing the whole page to scroll horizontally.
+
 ### Should/could have
 
 - Preset buy budgets and a shareable comparison that expires or prominently preserves its snapshot time.
@@ -110,6 +131,7 @@ All targets below are product hypotheses for the first 30-day closed beta; they 
 - A normalized percentage-return mode and a one-venue candlestick inspection mode within the same chart surface, after usability testing confirms that these do not obscure the default absolute-IDR three-venue close comparison.
 - Custom date ranges, custom bucket sizes, sub-hour intervals, and additional presets after the fixed four-period capability, loading behavior, retention, and usage are validated.
 - A direct path from pair detail into the existing size-aware comparison with the eligible pair preselected, after the landing route accepts and validates pair state from the URL. Until then, Markets must not imply that preselection is available.
+- Subtle nonessential theme enhancements such as static grid/noise textures, SVG circuit accents, or one restrained entrance treatment per view, after accessibility and performance gates pass.
 
 ### Non-goals
 
@@ -125,6 +147,10 @@ All targets below are product hypotheses for the first 30-day closed beta; they 
 - Personalized watchlists, alerts, pair favorites, or historical data export as part of this Markets increment.
 - Candlestick, area, volume, technical-indicator, drawing-tool, predictive, or streaming tick charts in this increment. The required historical comparison is a line chart of closed-bucket close prices only.
 - Treating `All` as exchange-lifetime history when upstream retention, product retention, or display rights provide a shorter window; backfilling unavailable history from synthetic pairs or third-party prices is prohibited.
+- Changing APIs, market calculations, catalog eligibility, navigation routes, information architecture, product claims, chart period contracts, venue ordering, or analytics payload meaning solely to accommodate the cyberpunk theme.
+- Adding authentication, permissions, private exchange data, trading controls, gamification, badges/rewards, or fictional terminal data. This increment has no signed-in or permission-gated user state to redesign.
+- A user-selectable theme switcher or a separate light-theme redesign. The approved increment is one accessible dark-first cyberpunk presentation; a theme preference can be evaluated later if users need it.
+- Persistent flicker, strobing/glitch text, autoplay audio, custom cursors, pointer trails, decorative parallax, or always-running animation. These effects can impair legibility, access, and trust and are excluded even if associated with cyberpunk references.
 
 ## User experience
 
@@ -156,6 +182,17 @@ The detail header names the canonical pair, supported venues, overall update tim
 The one shared Highcharts line chart defaults to `1D` and offers `1D`, `1W`, `1Y`, and `All` controls. Eligible venue close series share the same time and absolute-IDR axes, use a persistent legend plus non-color identifiers, and expose aligned absolute OHLC values in a keyboard-accessible equivalent to the pointer tooltip. A venue may start later than another venue and remains comparable wherever both have accepted buckets; leading, middle, and trailing gaps stay visible. The chart states that a line point is a closed-candle close and can differ from the live last-traded price shown in the pricing panel.
 
 The chart must not visually bridge missing buckets. Initial loading uses accessible status text and does not imitate numeric data. Period changes keep the prior successful chart visible, label it with its actual period until replacement data is accepted, and announce progress without moving focus. Empty history, partial venue history, stale data, invalid history, all-sources-unavailable, period-query error, and retry/recovery states have specific copy. A manual retry refetches the currently selected chart period; retrying another aggregate detail component must not reset that period. Auto-refresh does not erase previously loaded healthy sections while replacement data is pending. Reduced-motion preference disables nonessential Highcharts and live-price transitions. Highcharts' accessibility features or an equivalent keyboard-accessible data table must make every rendered timestamp and venue close available without pointer hover.
+
+### Cyberpunk visual direction and route coverage
+
+The interface should read as a professional market-analysis console rather than a game HUD. Hierarchy comes first from typography, spacing, surface separation, and alignment; cyan/magenta glow and technical motifs provide identity but remain secondary. Prices and statuses must be scannable without visual noise, and warning/error states keep their semantic priority over brand accents.
+
+- `/`: the hero, primary comparison form, validation, loading/error/reconnecting states, venue result cards, methodology, disclosure, and footer share the same console vocabulary. The form remains the dominant action and results remain more visually prominent than decoration.
+- `/markets`: the title/methodology, search, health summary, venue columns/cards, pair links, generated-at disclosure, loading, empty-search, catalog-empty, partial, and page-level error states remain visually connected and retain stable venue identity.
+- `/markets/{pair}`: breadcrumb and size-comparison action precede pricing, chart/period controls, order books, public trades, OHLC tables, partial-data recovery, unsupported-pair, and disclosure content in the existing order. Dense regions may stack or use a labeled internal scroll area, but never hide units, venue labels, or recovery actions.
+- Not found and unsupported-pair states use the same shell and visual system and provide one obvious recovery link; they must not look like a broken or unstyled page.
+
+Loading surfaces reserve the eventual content footprint where practical and contain descriptive status text. Empty states explain why no data is present and what the user can do. Errors state the affected scope and offer a retry or navigation path. Partial/stale states retain healthy data, identify the venue/component in text, and do not receive the same treatment as a total failure. There is no authenticated permission state in this increment.
 
 ## Acceptance criteria
 
@@ -192,6 +229,17 @@ The chart must not visually bridge missing buckets. Initial loading uses accessi
 - **AC-31 — partial history:** Given one venue has complete selected-period history, one has leading or middle gaps, and one returns no valid history, when the chart renders, then complete and partial series remain visible with explicit states, gaps remain discontinuous, the unavailable venue stays named with a reason, and the UI makes no three-venue movement conclusion. With fewer than two venues containing an overlapping valid timestamp, the chart is observational only and shows no comparative language.
 - **AC-32 — period and visibility persistence:** Given the user selects a non-default period and hides one venue series, when background pricing/detail refresh occurs, then the period and visible-series choices remain unchanged, at least one venue series remains visible, and recovery or refresh is announced without moving focus.
 - **AC-33 — chart semantics disclosure:** Given any chart period is displayed, then adjacent copy identifies the selected period, canonical resolution, timezone, earliest and latest rendered bucket, and the distinction between candle close, live ticker last trade, and executable price. `All` additionally discloses per-venue retention limitations or later listing dates where known.
+- **AC-34 — all-route visual coverage:** Given a user visits `/`, `/markets`, a supported `/markets/{pair}`, an unsupported well-formed pair, or a malformed/not-found route, when each page and its shared header/footer are rendered, then every visible surface uses the approved cyberpunk token system and no legacy cream/white/coral presentation remains except where an explicitly approved semantic token resolves to a similar accessible value.
+- **AC-35 — state-complete visual coverage:** Given fixture-backed loading, empty, success, disabled, validation error, partial source, stale source, reconnecting, all-sources-unavailable, retry, and recovered states, when each affected component renders, then it remains recognizably part of the cyberpunk system, identifies its state in text or accessible name, and exposes the same recovery behavior and healthy data as before the rework.
+- **AC-36 — behavioral and semantic parity:** Given the pre-rework critical browser scenarios and deterministic API fixtures, when they run against the cyberpunk UI, then inputs/defaults, route canonicalization, API request parameters, calculations, venue ordering, period/series persistence, retry behavior, disclosures, outbound destinations, and emitted analytics payload meaning are unchanged; a presentation change alone cannot change winner eligibility or market claims.
+- **AC-37 — contrast and non-color meaning:** Given the approved dark palette, when normal text, large text, focus indicators, controls, chart data, and state treatments are measured against their actual backgrounds, then normal text meets at least 4.5:1, large text and essential UI/chart graphics meet at least 3:1, visible focus is at least 3:1 against adjacent colors, and success/warning/error/unavailable/winner distinctions also include text, icon, pattern, or shape rather than color or glow alone.
+- **AC-38 — keyboard, touch, and zoom:** Given keyboard-only navigation and a touch viewport at 375 CSS px, when the user completes the size-aware comparison and Markets-to-detail exploration at 200% zoom, then focus order follows visual order, focus is never obscured, icon-only controls have accessible names, every primary interactive target is at least 44 by 44 CSS px, adjacent targets have at least 8 CSS px separation, and no operation depends on hover, precise pointer movement, or animation.
+- **AC-39 — responsive data density:** Given viewports of 320, 375, 768, 1024, and 1440 CSS px and landscape mobile, when all route families render representative longest Indonesian labels, large IDR values, venue statuses, tables, and disclosures, then no page-level horizontal scroll, clipped primary action, overlapping content, detached unit, or ambiguous venue association appears. Any internally scrollable table has a programmatic label, keyboard access, visible overflow cue, and does not trap page scrolling.
+- **AC-40 — purposeful and reduced motion:** Given ordinary motion preferences, when a control changes state or content enters, then any animation communicates that change, normally completes within 150–300 ms, uses transform/opacity rather than reflowing layout, and never blocks input. Given reduced-motion preference, when the same journey runs, then nonessential glow pulses, reveals, scans, parallax, and chart entrance animation are absent while all status changes remain perceivable.
+- **AC-41 — readable financial data:** Given prices, quantities, timestamps, fees, slippage, and health labels across cards, tables, and results, when the cyberpunk typography and effects are applied, then numerals remain tabular or consistently aligned where compared, labels and units remain visible, body copy is at least 16 CSS px on mobile with 1.5 or greater line height, text is not obscured by glow/texture, and truncation never hides a material qualifier without an accessible full value.
+- **AC-42 — chart theme integrity:** Given complete, partial, gapped, and unavailable chart fixtures in both ordinary and reduced-motion modes, when the themed chart renders, then all visible venue series, axes, grid lines, legend controls, tooltip/data equivalent, gap boundaries, selected period, and unavailability reasons remain distinguishable on dark surfaces; venue comparison does not rely on cyan/magenta hue alone and the chart retains the semantics in AC-25 through AC-33.
+- **AC-43 — visual stability and performance:** Given representative mobile and desktop beta profiles with cold and warm loads, when each route and a period change are measured, then decorative assets reserve space or do not affect layout, no theme animation introduces layout shift, the proposed p75 LCP/CLS/INP targets are met or a documented product/CTO exception blocks release, and primary pricing or form interaction is not delayed by nonessential fonts, textures, or effects.
+- **AC-44 — analytics continuity and visual feedback:** Given a critical journey before and after the rework, when the same user action occurs, then each existing product event fires once with the same non-sensitive meaning and no new raw order intent, theme preference, pointer trail, or free-text aesthetic data is collected. If the proposed visual validation runs, `visual_rework_feedback` records only anonymous/session ID, route family, structured clarity response, structured style-recognition response, and build version with consent where required.
 
 ## Dependencies and constraints
 
@@ -212,6 +260,10 @@ The chart must not visually bridge missing buckets. Initial loading uses accessi
 - Chart history needs a bounded period/resolution query contract with server-side allowlisting of the four presets, per-venue capability and retention metadata, cache keys that include canonical pair plus period/resolution, cancellation or stale-response protection, and response limits. Arbitrary client-supplied date ranges or intervals are rejected.
 - Highcharts and its React integration must pass dependency, bundle-size, security, accessibility, and commercial-license review. A compatible paid license is a release dependency for any use that is not covered by Highcharts' current terms; library installation alone is not evidence of permission to ship.
 - Pricing, order-book, and transaction components may continue to use the aggregate detail snapshot, but chart period selection may use a dedicated bounded history capability so a long-history request does not delay fresh primary pricing. The CTO owns the endpoint boundary and cache design while preserving the product behavior in AC-25 through AC-33.
+- The cyberpunk rework depends on a shared semantic token contract for surfaces, typography, borders, focus, interaction, venue identity, and health states; page-level hard-coded visual values are not an acceptable source of truth.
+- Heading, body, and numeric typefaces require license approval, Indonesian glyph coverage, stable fallbacks, and a loading strategy that does not hide text or shift financial values. A system-font fallback must remain usable if a web font fails.
+- Theme assets must be vector/CSS or optimized bounded media with declared dimensions. A consistent vector icon family and official unmodified venue/brand assets are required where logos are displayed; emoji are not structural controls or status icons.
+- QA needs deterministic fixtures for every route and state in AC-34 through AC-44, including longest labels/values, 200% zoom, reduced motion, and chart partial/gap cases, plus screenshot baselines at the approved viewports.
 
 ## Risks and mitigations
 
@@ -234,6 +286,11 @@ The chart must not visually bridge missing buckets. Initial loading uses accessi
 | Long `1Y` or `All` requests exceed upstream limits or slow pair detail              | Timeout, rate limiting, or unusable chart      | High                | Dedicated bounded history query, canonical aggregation/cache, progressive non-blocking state, response limits, and shadow performance evidence; CTO/QA |
 | Different venue listing dates or retention are mistaken for equal full history     | Misleading comparison                           | High                | Earliest-available disclosure, per-venue leading gaps and capability metadata, no synthetic backfill, and no three-venue conclusion without overlap; Product/CTO |
 | Rapid period selection lets an older response replace the latest selection         | Wrong period displayed under the active label  | Medium              | Request identity/cancellation, atomic label-and-data update, deterministic race tests, and retained prior-chart labeling; Frontend/QA |
+| Neon accents, glow, or texture reduce contrast or obscure dense financial data      | Misread values, inaccessible controls, reduced trust | Medium | Contrast-check actual composited backgrounds; cap decorative intensity; keep hierarchy token-driven; Design/Frontend/QA |
+| Cyberpunk colors override warning, error, venue, or winner semantics                | Users misinterpret health or recommendation state | Medium | Reserve semantic roles, require text/icon reinforcement, and test grayscale/color-vision scenarios; Product/Design/QA |
+| Theme motion distracts from live changes or harms motion-sensitive users            | Core monitoring journey becomes unusable or unsafe | Medium | Motion budget, no persistent flicker, reduced-motion coverage, and release-blocking AC-40 evidence; Frontend/QA |
+| Fonts and decorative assets increase load time or layout shift                      | Slower first comparison and unstable data display | Medium | Font fallbacks, asset budgets, lazy/nonblocking decoration, reserved dimensions, and web-vitals gate; CTO/Frontend/QA |
+| A broad visual rewrite unintentionally changes product behavior                     | Regressions in routing, calculations, recovery, or analytics | Medium | Component-by-component parity matrix, existing deterministic suites, event comparison, staged rollout, and fast presentation rollback; Product/Frontend/QA |
 
 ## Analytics and release readiness
 
@@ -249,6 +306,7 @@ Minimum product events:
 - `market_snapshot_retried`: canonical pair, component/venue reason-code summary from the failed aggregate, and retry outcome; do not log every automatic poll.
 - `market_chart_period_selected`: canonical pair, previous and selected preset, available/partial/unavailable venue counts, request duration bucket, and outcome. Do not log free-form dates because custom ranges are out of scope.
 - `market_chart_series_toggled`: canonical pair, selected period, venue, and resulting visible-series count; sampling is allowed and at least one visible series is enforced.
+- `visual_rework_feedback` only if the proposed moderated/closed-beta validation is run: anonymous/session ID, route family, structured clarity response, structured style-recognition response, and build version. Do not collect free-text trading intent or infer a theme preference from passive behavior.
 
 Rollout:
 
@@ -270,6 +328,10 @@ Release gates:
 - Historical storage/display rights and retention are approved per venue before that venue's chart is enabled outside internal evaluation; an unavailable chart cannot be represented as zero movement.
 - An applicable Highcharts license and dependency approval are documented before any external or commercial deployment; absence of approval permits fixture-backed internal development only.
 - Shadow evidence covers the largest approved `All` response and rapid period switching on representative mobile and desktop profiles without delaying primary pricing. Product and CTO approve response-time and payload thresholds before closed beta; until measured, passing functional tests alone does not clear this gate.
+- The visual evidence matrix covers every route family and the loading, empty, success, validation, partial, stale, reconnecting, error, retry, disabled, unsupported, and not-found states at 375 and 1440 CSS px, plus representative 320/768/1024 and landscape checks. Evidence includes ordinary and reduced-motion screenshots, 200% zoom, keyboard traversal, touch-target measurements, contrast results, and automated accessibility output.
+- Existing unit, integration, and browser suites pass without a changed market-data fixture expectation attributable only to styling. AC-34 through AC-44 are reconciled with that evidence, and any intentional deviation is approved in this PRD before release.
+- Web-vitals evidence meets the proposed cyberpunk performance targets or the release remains internal until Product and CTO document an explicit exception and remediation date.
+- The cyberpunk presentation is rolled through internal evaluation before closed beta. A critical loss of readability, keyboard access, semantic state clarity, task completion, or material performance regression triggers rollback to the last approved presentation build without changing backend data behavior.
 
 Rollback or ranking-disable triggers include a confirmed material miscalculation, stale data ranked as current, repeated sequence/schema corruption, unauthorized data use, or an upstream request to stop. The safe degraded state is to disable ranking/alerts for the affected source, retain transparent health information, and avoid substituting synthetic prices.
 
@@ -292,3 +354,5 @@ Rollback or ranking-disable triggers include a confirmed material miscalculation
 | What payload-size and latency thresholds should gate `1Y` and `All` after shadow measurement?             | CTO with QA | Before closed-beta readiness | Open; Product requires non-blocking primary pricing and visible loading/partial states |
 | Should selected chart period be URL-persisted and shareable?                                              | Product/design with CTO | Follow-up after four-presets ship | Deferred; session/component persistence is required, URL persistence is not required by AC-27 or AC-32 |
 | Should a normalized percentage-return mode and single-venue candlestick mode follow the absolute close-line overlay? | Product/design | Post-comparison usability test | Deferred; not required for this Markets increment |
+| Which exact cyberpunk palette, typography pair, icon family, surface geometry, and effect budget pass contrast, licensing, Indonesian glyph, and performance review? | Product/design with Frontend and CTO | Before visual implementation sign-off | Open; the semantic direction and excluded effects are fixed, exact tokens are not yet approved |
+| Does the closed-beta cohort need a persistent high-contrast or lighter presentation in addition to the dark-first cyberpunk system? | Product/design with QA | After accessibility testing and first moderated validation | Open; a theme switcher is out of scope until evidence shows a need |

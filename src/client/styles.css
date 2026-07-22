@@ -1,39 +1,310 @@
+@import '@fontsource/orbitron/latin-600.css';
+@import '@fontsource/orbitron/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-600.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
     font-synthesis: none;
+    --color-canvas: 5 8 18;
+    --color-surface: 11 18 36;
+    --color-surface-soft: 14 24 48;
+    --color-surface-raised: 19 33 61;
+    --color-surface-strong: 7 20 38;
+    --color-foreground: 242 248 255;
+    --color-muted: 166 188 211;
+    --color-border: 54 90 128;
+    --color-primary: 34 211 238;
+    --color-primary-strong: 103 232 249;
+    --color-primary-soft: 8 43 55;
+    --color-on-primary: 3 16 24;
+    --color-accent: 244 114 182;
+    --color-accent-soft: 47 18 46;
+    --color-success: 74 222 128;
+    --color-success-soft: 10 45 35;
+    --color-warning: 251 191 36;
+    --color-warning-soft: 48 34 7;
+    --color-warning-strong: 146 64 14;
+    --color-danger: 251 113 133;
+    --color-danger-soft: 51 17 28;
+    --color-danger-strong: 190 18 60;
+    --color-status-unavailable: 124 145 166;
+    --color-focus: 103 232 249;
+    --chart-indodax: #22d3ee;
+    --chart-reku: #f472b6;
+    --chart-tokocrypto: #4ade80;
+    --motion-fast: 160ms;
+    --motion-ui: 220ms;
+    --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --hud-corner: 18px;
   }
+
   html {
+    min-width: 320px;
     scroll-behavior: smooth;
+    background: rgb(var(--color-canvas));
   }
+
   body {
     margin: 0;
     min-width: 320px;
-    background: #f7f5ee;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-color: rgb(var(--color-canvas));
+    background-image:
+      radial-gradient(circle at 12% 4%, rgb(var(--color-primary) / 0.1), transparent 30rem),
+      radial-gradient(circle at 88% 18%, rgb(var(--color-accent) / 0.075), transparent 28rem),
+      linear-gradient(rgb(var(--color-primary) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--color-primary) / 0.025) 1px, transparent 1px),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgb(var(--color-foreground) / 0.012) 3px,
+        rgb(var(--color-foreground) / 0.012) 4px
+      );
+    background-size:
+      auto,
+      auto,
+      40px 40px,
+      40px 40px,
+      auto;
+    color: rgb(var(--color-foreground));
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
   }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: Orbitron, ui-sans-serif, system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  summary {
+    touch-action: manipulation;
+  }
+
+  button,
+  a,
+  summary,
+  select {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  .tabular-nums,
+  table,
+  code,
+  output {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
   ::selection {
-    background: rgba(255, 107, 84, 0.25);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
+    background: rgb(var(--color-primary) / 0.28);
+    color: rgb(var(--color-foreground));
   }
 }
 
 @layer components {
+  .app-shell {
+    @apply min-h-screen bg-canvas text-foreground;
+  }
+
+  .hud-header {
+    @apply relative overflow-hidden border-b border-border/70 bg-surface-strong text-foreground;
+    background-image:
+      linear-gradient(120deg, rgb(var(--color-primary) / 0.08), transparent 42%),
+      linear-gradient(300deg, rgb(var(--color-accent) / 0.055), transparent 38%);
+  }
+
+  .hud-header::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--color-primary) / 0.65),
+      rgb(var(--color-accent) / 0.36),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  .hud-panel,
+  .hud-panel-static {
+    @apply relative border border-border/80 bg-surface shadow-panel;
+    border-radius: 0.5rem;
+    background-image:
+      linear-gradient(135deg, rgb(var(--color-primary) / 0.055), transparent 7rem),
+      linear-gradient(315deg, rgb(var(--color-accent) / 0.03), transparent 9rem);
+  }
+
+  .hud-panel::before,
+  .hud-panel-static::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    inset: -1px -1px auto auto;
+    width: var(--hud-corner);
+    height: var(--hud-corner);
+    border-top: 2px solid rgb(var(--color-primary) / 0.9);
+    border-right: 2px solid rgb(var(--color-primary) / 0.9);
+    pointer-events: none;
+  }
+
+  .hud-panel {
+    transition:
+      border-color var(--motion-ui) var(--ease-ui),
+      box-shadow var(--motion-ui) var(--ease-ui),
+      background-color var(--motion-ui) var(--ease-ui);
+  }
+
+  .hud-panel:hover {
+    @apply border-primary/50 shadow-glow;
+  }
+
+  .eyebrow {
+    @apply font-display text-xs font-semibold uppercase tracking-[0.16em] text-primary;
+  }
+
   .input-control {
-    @apply min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-ink outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-coral focus:ring-4 focus:ring-coral/15 disabled:cursor-not-allowed disabled:bg-slate-100;
+    @apply min-h-12 rounded-md border border-border bg-surface-soft px-4 py-3 text-base text-foreground outline-none transition-colors duration-ui placeholder:text-muted/70 hover:border-primary/60 focus:border-primary focus:ring-4 focus:ring-focus/20 disabled:bg-surface-raised disabled:text-muted;
+  }
+
+  .action-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-primary bg-primary px-5 py-3 text-sm font-extrabold text-on-primary shadow-glow transition duration-ui hover:border-primary-strong hover:bg-primary-strong focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/35 disabled:opacity-50;
+  }
+
+  .action-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface-soft px-4 py-2.5 text-sm font-extrabold text-foreground transition-colors duration-ui hover:border-primary hover:text-primary focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/30 disabled:opacity-50;
+  }
+
+  .action-danger {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-danger bg-danger-strong px-4 py-2.5 text-sm font-bold text-foreground transition-colors duration-ui hover:border-danger hover:bg-danger-soft focus:outline-none focus-visible:ring-4 focus-visible:ring-focus/30;
+  }
+
+  .state-success {
+    @apply border border-success/40 bg-success-soft text-foreground;
+  }
+
+  .state-warning {
+    @apply border border-warning/45 bg-warning-soft text-foreground;
+  }
+
+  .state-danger {
+    @apply border border-danger/45 bg-danger-soft text-foreground;
+  }
+
+  .state-unavailable {
+    @apply border border-border bg-surface-raised text-muted;
+  }
+
+  .table-shell {
+    @apply relative overflow-x-auto rounded-md border border-border/80 bg-surface shadow-panel;
+    scrollbar-color: rgb(var(--color-primary) / 0.7) rgb(var(--color-surface-raised));
+  }
+
+  .table-shell:focus-visible {
+    outline: 3px solid rgb(var(--color-focus));
+    outline-offset: 3px;
+  }
+
+  .table-shell::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    float: right;
+    width: 1.25rem;
+    height: 1px;
+    box-shadow: -12px 0 20px rgb(var(--color-canvas) / 0.55);
+    pointer-events: none;
+  }
+
+  .data-table thead {
+    @apply bg-surface-raised text-muted;
+  }
+
+  .data-table tbody {
+    @apply divide-y divide-border/55;
+  }
+
+  .data-table tbody tr {
+    transition: background-color var(--motion-fast) var(--ease-ui);
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-primary-soft/45;
+  }
+
+  .status-dot {
+    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-current bg-current;
+    box-shadow: 0 0 10px currentColor;
+  }
+
+  .terminal-rule {
+    @apply border-border/70;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .hud-panel,
+  .hud-panel-static,
+  .hud-header {
+    background-image: none;
+  }
+
+  :focus-visible {
+    outline: 3px solid Highlight;
   }
 }
